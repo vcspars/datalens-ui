@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, BarChart3, Download, Database, Sheet, Send, Maximize2, Minimize2, Network } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FileText, BarChart3, Download, Database, Sheet, Send, Maximize2, Minimize2, Network, CheckCircle2, XCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import PDFViewer from "./PDFViewer";
 import CSVPreview from "./CSVPreview";
@@ -23,6 +24,12 @@ interface DataTabsProps {
 export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFullscreen, onToggleFullscreen }: DataTabsProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const [pendingTabChange, setPendingTabChange] = useState<string | null>(null);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<any[]>([]);
+  const [showTabChangeDialog, setShowTabChangeDialog] = useState(false);
+  const csvPreviewConfirmRef = useRef<(() => void) | null>(null);
+  const csvPreviewDiscardRef = useRef<(() => void) | null>(null);
   const [dataset, setDataset] = useState<DatasetResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [reportText, setReportText] = useState("Loading report...");
@@ -154,8 +161,55 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
     }
   };
 
+  const handleTabChange = (newTab: string) => {
+    // If there are pending changes and user is leaving CSV Preview tab
+    if (hasPendingChanges && activeTab === "csvPreview" && newTab !== "csvPreview") {
+      setPendingTabChange(newTab);
+      setShowTabChangeDialog(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  };
+  
+  const handleSaveAndSwitchTab = () => {
+    // Close tab change dialog
+    setShowTabChangeDialog(false);
+    
+    // Trigger CSVPreview's confirm dialog with callback to switch tab after save
+    if (csvPreviewConfirmRef.current) {
+      const targetTab = pendingTabChange;
+      csvPreviewConfirmRef.current(() => {
+        // This callback will be called after changes are confirmed
+        if (targetTab) {
+          setActiveTab(targetTab);
+          setPendingTabChange(null);
+        }
+      });
+    }
+  };
+  
+  const handleDiscardAndSwitchTab = () => {
+    // Close tab change dialog
+    setShowTabChangeDialog(false);
+    
+    // Discard changes and switch tab
+    if (csvPreviewDiscardRef.current && pendingTabChange) {
+      const targetTab = pendingTabChange;
+      csvPreviewDiscardRef.current(() => {
+        // Switch tab after discard
+        setActiveTab(targetTab);
+        setPendingTabChange(null);
+      });
+    }
+  };
+  
+  const handleCancelTabChange = () => {
+    setShowTabChangeDialog(false);
+    setPendingTabChange(null);
+  };
+
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col overflow-hidden">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="h-full flex flex-col overflow-hidden">
       <div className="px-4 pt-4 border-b bg-background flex items-center justify-between flex-shrink-0">
         <TabsList className="flex-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -212,7 +266,17 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
             <TabsContent value="csvPreview" className="mt-0 h-[calc(100vh-200px)]">
               <Card className="h-full">
                 <CardContent className="p-0 h-full">
-                  <CSVPreview csvId={datasetId} />
+                  <CSVPreview 
+                    csvId={datasetId}
+                    onPendingChangesChange={(hasChanges, changes) => {
+                      setHasPendingChanges(hasChanges);
+                      setPendingChanges(changes);
+                    }}
+                    onRequestConfirm={(confirmFn, discardFn) => {
+                      csvPreviewConfirmRef.current = confirmFn;
+                      csvPreviewDiscardRef.current = discardFn;
+                    }}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -317,6 +381,53 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
         reportContent={reportText}
         reportName="Analysis Report"
       />
+      
+      {/* Tab Change Confirmation Dialog */}
+      <Dialog open={showTabChangeDialog} onOpenChange={setShowTabChangeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved Changes</DialogTitle>
+            <DialogDescription>
+              You have {pendingChanges.length} pending change{pendingChanges.length > 1 ? 's' : ''} in the CSV Preview tab.
+              What would you like to do?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-2">
+              {pendingChanges.map((change, index) => (
+                <div key={index} className="text-sm">
+                  <span className="font-medium">
+                    {change.type === 'add' ? 'Add' : change.type === 'delete' ? 'Delete' : 'Modify'}:
+                  </span> {change.columnName}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCancelTabChange}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDiscardAndSwitchTab}
+              className="gap-2"
+            >
+              <XCircle className="h-4 w-4" />
+              Discard & Switch
+            </Button>
+            <Button
+              onClick={handleSaveAndSwitchTab}
+              className="gap-2"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Save & Switch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Tabs>
   );
 }

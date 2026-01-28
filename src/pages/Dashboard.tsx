@@ -1,11 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Chatbot from "@/components/Chatbot";
 import DataTabs from "@/components/DataTabs";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function Dashboard() {
   const { type, id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [leftWidth, setLeftWidth] = useState(40);
   const [questionToSend, setQuestionToSend] = useState<string>("");
   const [chatFullscreen, setChatFullscreen] = useState(false);
@@ -15,7 +18,33 @@ export default function Dashboard() {
 
   const datasetType = (type as 'pdf' | 'csv' | 'database') || 'database';
   // Keep ID as string since backend uses MongoDB ObjectId strings
-  const datasetId = id || "1";
+  // Don't default to "1" - require a valid ID
+  const datasetId = id;
+  
+  // Validate dataset ID - MongoDB ObjectIds are 24-character hex strings
+  useEffect(() => {
+    // Only validate if we're on a route with an ID parameter
+    // If accessing /dashboard without ID, redirect immediately
+    if (!id) {
+      navigate("/my-datasets", { replace: true });
+      return;
+    }
+    
+    if (!datasetId) {
+      navigate("/my-datasets", { replace: true });
+      return;
+    }
+    
+    // MongoDB ObjectIds are 24-character hexadecimal strings
+    if (datasetId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(datasetId)) {
+      toast({
+        title: "Invalid dataset ID",
+        description: `"${datasetId}" is not a valid dataset ID. Please select a valid dataset from My Datasets.`,
+        variant: "destructive",
+      });
+      navigate("/my-datasets", { replace: true });
+    }
+  }, [id, datasetId, navigate, toast]);
 
   const handleMouseDown = () => {
     if (chatFullscreen || tabsFullscreen) return;
@@ -72,14 +101,16 @@ export default function Dashboard() {
             style={chatFullscreen ? { width: '100%' } : { width: `${leftWidth}%` }}
             className="h-full transition-all duration-300 hidden lg:flex flex-col"
           >
-            <Chatbot 
-              datasetId={datasetId} 
-              datasetType={datasetType}
-              externalQuestion={questionToSend}
-              onQuestionSent={() => setQuestionToSend("")}
-              isFullscreen={chatFullscreen}
-              onToggleFullscreen={toggleChatFullscreen}
-            />
+            {datasetId && (
+              <Chatbot 
+                datasetId={datasetId} 
+                datasetType={datasetType}
+                externalQuestion={questionToSend}
+                onQuestionSent={() => setQuestionToSend("")}
+                isFullscreen={chatFullscreen}
+                onToggleFullscreen={toggleChatFullscreen}
+              />
+            )}
           </div>
         )}
         {!chatFullscreen && !tabsFullscreen && (
@@ -90,13 +121,15 @@ export default function Dashboard() {
             style={tabsFullscreen ? { width: '100%' } : { width: `${100 - leftWidth}%` }}
             className="h-full bg-background transition-all duration-300 flex-1 min-w-0"
           >
-            <DataTabs 
-              datasetType={datasetType} 
-              datasetId={datasetId}
-              onSendQuestion={handleSendQuestionFromTabs}
-              isFullscreen={tabsFullscreen}
-              onToggleFullscreen={toggleTabsFullscreen}
-            />
+            {datasetId && (
+              <DataTabs 
+                datasetType={datasetType} 
+                datasetId={datasetId}
+                onSendQuestion={handleSendQuestionFromTabs}
+                isFullscreen={tabsFullscreen}
+                onToggleFullscreen={toggleTabsFullscreen}
+              />
+            )}
           </div>
         )}
       </div>

@@ -70,13 +70,19 @@ export default function UploadPDFDialog({ open, onOpenChange }: UploadPDFDialogP
 
       const response = await uploadPDF(formData);
       
+      if (!response || !response.id) {
+        throw new Error("Invalid response from server");
+      }
+      
       toast({
         title: "PDF uploaded successfully",
         description: `${name} has been processed and is ready to use.`,
       });
 
       // Navigate to the dashboard with the new dataset
-      navigate(`/dashboard/pdf/${response.id}`);
+      // Use MongoDB ObjectId (_id) if available, otherwise use numeric id
+      const datasetId = response._id || response.id.toString();
+      navigate(`/dashboard/pdf/${datasetId}`);
       onOpenChange(false);
       resetForm();
     } catch (error) {

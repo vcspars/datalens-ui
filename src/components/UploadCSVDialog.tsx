@@ -70,13 +70,19 @@ export default function UploadCSVDialog({ open, onOpenChange }: UploadCSVDialogP
 
       const response = await uploadCSV(formData);
       
+      if (!response || !response.id) {
+        throw new Error("Invalid response from server");
+      }
+      
       toast({
         title: "Dataset uploaded successfully",
         description: `${name} has been processed and is ready to use.`,
       });
 
       // Navigate to the dashboard with the new dataset
-      navigate(`/dashboard/csv/${response.id}`);
+      // Use MongoDB ObjectId (_id) if available, otherwise use numeric id
+      const datasetId = response._id || response.id.toString();
+      navigate(`/dashboard/csv/${datasetId}`);
       onOpenChange(false);
       resetForm();
     } catch (error) {

@@ -15,8 +15,8 @@ export const removeAuthToken = (): void => {
   localStorage.removeItem("auth_token");
 };
 
-// API request helper
-const apiRequest = async <T>(
+// API request helper (exported for use in components)
+export const apiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> => {
@@ -40,11 +40,37 @@ const apiRequest = async <T>(
   });
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - token might be expired
+    if (response.status === 401) {
+      removeAuthToken();
+      // Redirect to login or show error
+      if (typeof window !== 'undefined') {
+        // Don't redirect automatically - let the app handle it
+        // window.location.href = '/auth';
+      }
+      throw new Error("Authentication failed. Please login again.");
+    }
     const error = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(error.detail || `HTTP error! status: ${response.status}`);
   }
 
-  return response.json();
+  // Handle 204 No Content responses (like DELETE) - no body
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  // Try to parse JSON, but handle empty responses
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch (e) {
+    console.error("Failed to parse JSON response:", e, "Response text:", text);
+    throw new Error("Invalid JSON response from server");
+  }
 };
 
 // Authentication API
@@ -175,15 +201,33 @@ const generateDummyResponse = (name: string, type: 'pdf' | 'csv' | 'database'): 
 // API endpoints (dummy implementations)
 
 export const uploadPDF = async (formData: FormData): Promise<DatasetResponse> => {
-  const response = await apiRequest<DatasetResponse>("/datasets/upload/pdf", {
+  const response = await apiRequest<{
+    id: string;
+    name: string;
+    dataset_type: 'pdf' | 'csv' | 'database';
+    file_name: string;
+    file_size: number;
+    description?: string;
+    uploaded_at: string;
+    size: string;
+  }>("/datasets/upload/pdf", {
     method: "POST",
     body: formData,
     headers: {}, // Let browser set Content-Type with boundary for FormData
   });
   
+  if (!response) {
+    throw new Error("No response received from server");
+  }
+  
+  if (!response.id) {
+    console.error("Invalid response structure:", response);
+    throw new Error("Invalid response: missing 'id' field");
+  }
+  
   // Convert to expected format
   return {
-    id: parseInt(response.id) || Math.floor(Math.random() * 10000),
+    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
     type: response.dataset_type as 'pdf' | 'csv' | 'database',
     summary: `PDF document "${response.name}" uploaded successfully.`,
@@ -195,19 +239,38 @@ export const uploadPDF = async (formData: FormData): Promise<DatasetResponse> =>
     ],
     uploadedAt: new Date(response.uploaded_at).toISOString(),
     size: response.size,
+    _id: response.id, // Store MongoDB ObjectId for navigation
   };
 };
 
 export const uploadCSV = async (formData: FormData): Promise<DatasetResponse> => {
-  const response = await apiRequest<DatasetResponse>("/datasets/upload/csv", {
+  const response = await apiRequest<{
+    id: string;
+    name: string;
+    dataset_type: 'pdf' | 'csv' | 'database';
+    file_name: string;
+    file_size: number;
+    description?: string;
+    uploaded_at: string;
+    size: string;
+  }>("/datasets/upload/csv", {
     method: "POST",
     body: formData,
     headers: {}, // Let browser set Content-Type with boundary for FormData
   });
   
+  if (!response) {
+    throw new Error("No response received from server");
+  }
+  
+  if (!response.id) {
+    console.error("Invalid response structure:", response);
+    throw new Error("Invalid response: missing 'id' field");
+  }
+  
   // Convert to expected format
   return {
-    id: parseInt(response.id) || Math.floor(Math.random() * 10000),
+    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
     type: response.dataset_type as 'pdf' | 'csv' | 'database',
     summary: `CSV dataset "${response.name}" uploaded successfully.`,
@@ -219,6 +282,7 @@ export const uploadCSV = async (formData: FormData): Promise<DatasetResponse> =>
     ],
     uploadedAt: new Date(response.uploaded_at).toISOString(),
     size: response.size,
+    _id: response.id, // Store MongoDB ObjectId for navigation
   };
 };
 
@@ -295,6 +359,37 @@ export const getDatasetById = async (id: number | string): Promise<DatasetRespon
     uploadedAt: new Date(response.uploaded_at).toISOString(),
     size: response.size,
   };
+};
+
+export const deleteDataset = async (id: string): Promise<void> => {
+  await apiRequest<void>(`/datasets/${id}`, {
+    method: "DELETE",
+  });
+};
+
+export interface SaveChangesRequest {
+  columns: string[];
+  data: any[];
+}
+
+export interface SaveChangesResponse {
+  message: string;
+  rows_saved: number;
+  columns_saved: number;
+}
+
+export const saveDatasetChanges = async (
+  datasetId: string,
+  columns: string[],
+  data: any[]
+): Promise<SaveChangesResponse> => {
+  return await apiRequest<SaveChangesResponse>(`/datasets/${datasetId}/save-changes`, {
+    method: "POST",
+    body: JSON.stringify({
+      columns,
+      data,
+    }),
+  });
 };
 
 // Check if VCS special access is enabled
