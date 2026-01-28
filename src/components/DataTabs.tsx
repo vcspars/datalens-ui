@@ -175,7 +175,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
                 )}
                 Data Summary
               </div>
-              {datasetType === 'pdf' && (!dataset?.summary_generated || !dataset?.summary) && (
+              {((datasetType === 'pdf' || datasetType === 'csv') && (!dataset?.summary_generated || !dataset?.summary)) && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -199,11 +199,23 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <ScrollArea className="h-[200px] pr-2 sm:pr-4">
-              <p className="text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                {dataSummaryText}
-              </p>
-            </ScrollArea>
+            {dataset?.summary ? (
+              <ScrollArea className="h-[200px] pr-2 sm:pr-4">
+                <p className="text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                  {dataset.summary}
+                </p>
+              </ScrollArea>
+            ) : (datasetType === 'database' || !dataset) ? (
+              <ScrollArea className="h-[200px] pr-2 sm:pr-4">
+                <p className="text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                  {dataSummaryText}
+                </p>
+              </ScrollArea>
+            ) : (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                No summary generated yet. Click "Generate Summary" to create a data summary.
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -211,7 +223,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center justify-between text-base sm:text-lg">
               <span>Suggested Questions</span>
-              {datasetType === 'pdf' && (!dataset?.questions_generated || !dataset?.questions || dataset.questions.length === 0) && (
+              {((datasetType === 'pdf' || datasetType === 'csv') && (!dataset?.questions_generated || !dataset?.questions || dataset.questions.length === 0)) && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -430,7 +442,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
                   <CardDescription className="text-xs sm:text-sm">Detailed insights from your data analysis</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  {datasetType === 'pdf' && (!dataset?.report_generated || !dataset?.report) && (
+                  {((datasetType === 'pdf' || datasetType === 'csv') && (!dataset?.report_generated || !dataset?.report)) && (
                     <Button 
                       onClick={handleGenerateReport} 
                       variant="outline" 

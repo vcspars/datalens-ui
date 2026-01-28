@@ -56,16 +56,18 @@ export default function Chatbot({ datasetId, datasetType, externalQuestion, onQu
   }, [messages]);
 
   useEffect(() => {
-    if (externalQuestion && externalQuestion.trim()) {
-      setInput(externalQuestion);
-      // Trigger send after a brief delay to allow input state to update
-      setTimeout(() => {
-        handleSend(externalQuestion);
+    const handleExternalQuestion = async () => {
+      if (externalQuestion && externalQuestion.trim()) {
+        setInput(externalQuestion);
+        // Trigger send after a brief delay to allow input state to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await handleSend(externalQuestion);
         if (onQuestionSent) {
           onQuestionSent();
         }
-      }, 100);
-    }
+      }
+    };
+    handleExternalQuestion();
   }, [externalQuestion]);
 
   const handleSend = async (messageText?: string) => {
@@ -91,17 +93,17 @@ export default function Chatbot({ datasetId, datasetType, externalQuestion, onQu
         ? '/api/chat/chat_with_csv/'
         : '/api/chat/chat_with_database/';
 
-      // Mock response for now
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'This is a sample response. Connect to your Django backend to get real responses.',
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsLoading(false);
-      }, 1000);
+      // Mock response for now - simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'This is a sample response. Connect to your Django backend to get real responses.',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setIsLoading(false);
     } catch (error) {
       console.error('Error sending message:', error);
       setIsLoading(false);

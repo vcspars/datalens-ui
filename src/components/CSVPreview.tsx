@@ -27,7 +27,7 @@ import AddIntelligentColumnDialog from "./AddIntelligentColumnDialog";
 import ColumnCalculationModal from "./ColumnCalculationModal";
 import EditableCell from "./EditableCell";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, saveDatasetChanges } from "@/lib/api";
+import { apiRequest, saveDatasetChanges, getDatasetById } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface CSVPreviewProps {
@@ -260,10 +260,91 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
     enableColumnResizing: false,
   });
 
-  const handleExport = useCallback(() => {
-    console.log('Exporting CSV:', csvId);
-    // Call backend API to export
-  }, [csvId]);
+  const handleExport = useCallback(async () => {
+    try {
+      // Warn user if there are unsaved changes
+      if (pendingChanges.length > 0) {
+        toast({
+          title: "Unsaved changes detected",
+          description: "You have unsaved changes. The export will include only saved data. Save changes first to include them in the export.",
+          variant: "default",
+        });
+      }
+      
+      // Get dataset info for filename
+      const datasetInfo = await getDatasetById(csvId);
+      const fileName = datasetInfo.file_name || `dataset_${csvId}.csv`;
+      const baseFileName = fileName.replace(/\.[^/.]+$/, '');
+      
+      // Fetch all data from backend (includes saved changes, but not unsaved pending changes)
+      const response = await apiRequest<{
+        columns: string[];
+        data: any[];
+        total_rows: number;
+      }>(`/datasets/${csvId}/data?limit=1000000`);
+      
+      if (!response || !response.data || !response.columns) {
+        throw new Error("Failed to fetch data for export");
+      }
+      
+      const dataToExport = response.data;
+      const exportColumns = response.columns;
+      
+      // Convert to CSV format
+      // Escape CSV values properly
+      const escapeCSVValue = (value: any): string => {
+        if (value === null || value === undefined) {
+          return '';
+        }
+        const stringValue = String(value);
+        // If value contains comma, newline, or quote, wrap in quotes and escape quotes
+        if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+      };
+      
+      // Create CSV content
+      const csvRows: string[] = [];
+      
+      // Add header row
+      csvRows.push(exportColumns.map(escapeCSVValue).join(','));
+      
+      // Add data rows
+      dataToExport.forEach((row) => {
+        const csvRow = exportColumns.map((col) => {
+          const value = row[col];
+          return escapeCSVValue(value);
+        });
+        csvRows.push(csvRow.join(','));
+      });
+      
+      const csvContent = csvRows.join('\n');
+      
+      // Create blob and trigger download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const exportFileName = `${baseFileName}_export.csv`;
+      link.download = exportFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "CSV exported successfully",
+        description: `Exported ${dataToExport.length} rows to ${exportFileName}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error?.message || "Failed to export CSV",
+        variant: "destructive",
+      });
+    }
+  }, [csvId, pendingChanges, toast]);
 
   const handleColumnAction = useCallback(async (action: string, columnId: string) => {
     try {

@@ -50,7 +50,12 @@ export const apiRequest = async <T>(
       }
       throw new Error("Authentication failed. Please login again.");
     }
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    let error: { detail?: string };
+    try {
+      error = await response.json();
+    } catch {
+      error = { detail: response.statusText };
+    }
     throw new Error(error.detail || `HTTP error! status: ${response.status}`);
   }
 
