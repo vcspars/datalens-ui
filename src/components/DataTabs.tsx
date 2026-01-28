@@ -3,14 +3,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FileText, BarChart3, Download, Database, Sheet, Send, Maximize2, Minimize2, Network, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, BarChart3, Download, Database, Sheet, Send, Maximize2, Minimize2, Network, CheckCircle2, XCircle, Sparkles, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import PDFViewer from "./PDFViewer";
 import CSVPreview from "./CSVPreview";
 import DatabaseERDViewer from "./DatabaseERDViewer";
 import ReportDesignSelectionDialog from "./ReportDesignSelectionDialog";
 import ReportPreviewDialog from "./ReportPreviewDialog";
-import { getDatasetById, DatasetResponse } from "@/lib/api";
+import { getDatasetById, DatasetResponse, generateSummary, generateQuestions, generateReport } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 
 interface DataTabsProps {
@@ -37,6 +37,9 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
   const [showDesignSelection, setShowDesignSelection] = useState(false);
   const [showReportPreview, setShowReportPreview] = useState(false);
   const [selectedDesign, setSelectedDesign] = useState("");
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   useEffect(() => {
     const loadDataset = async () => {
@@ -44,7 +47,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
         setIsLoading(true);
         const data = await getDatasetById(datasetId);
         setDataset(data);
-        setReportText(data.report);
+        setReportText(data.report || "");
       } catch (error: any) {
         toast({
           title: "Failed to load dataset",
@@ -71,6 +74,67 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
     "Which products have the highest profit margins?",
     "What is the average order value by region?"
   ];
+
+  const handleGenerateSummary = async () => {
+    try {
+      setIsGeneratingSummary(true);
+      const updated = await generateSummary(datasetId);
+      setDataset(updated);
+      toast({
+        title: "Summary generated",
+        description: "Summary has been generated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to generate summary",
+        description: error?.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const handleGenerateQuestions = async () => {
+    try {
+      setIsGeneratingQuestions(true);
+      const updated = await generateQuestions(datasetId);
+      setDataset(updated);
+      toast({
+        title: "Questions generated",
+        description: "Questions have been generated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to generate questions",
+        description: error?.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      setIsGeneratingReport(true);
+      const updated = await generateReport(datasetId);
+      setDataset(updated);
+      setReportText(updated.report || "");
+      toast({
+        title: "Report generated",
+        description: "Report has been generated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to generate report",
+        description: error?.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
 
   const handleSendQuestion = (question: string) => {
     if (onSendQuestion) {
@@ -100,15 +164,38 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              {datasetType === 'database' ? (
-                <Database className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              ) : datasetType === 'pdf' ? (
-                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              ) : (
-                <Sheet className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+              <div className="flex items-center gap-2">
+                {datasetType === 'database' ? (
+                  <Database className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                ) : datasetType === 'pdf' ? (
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                ) : (
+                  <Sheet className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                )}
+                Data Summary
+              </div>
+              {datasetType === 'pdf' && (!dataset?.summary_generated || !dataset?.summary) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerateSummary}
+                  disabled={isGeneratingSummary}
+                  className="gap-2"
+                >
+                  {isGeneratingSummary ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Generate Summary
+                    </>
+                  )}
+                </Button>
               )}
-              Data Summary
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
@@ -122,29 +209,56 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
 
         <Card>
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              Suggested Questions
+            <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+              <span>Suggested Questions</span>
+              {datasetType === 'pdf' && (!dataset?.questions_generated || !dataset?.questions || dataset.questions.length === 0) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerateQuestions}
+                  disabled={isGeneratingQuestions}
+                  className="gap-2"
+                >
+                  {isGeneratingQuestions ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Generate Questions
+                    </>
+                  )}
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-2">
-              {suggestedQuestions.map((question, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-2 p-2 sm:p-3 border rounded-lg hover:bg-muted/50 transition-colors group"
-                >
-                  <span className="text-xs sm:text-sm flex-1 text-foreground">{question}</span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8 opacity-70 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleSendQuestion(question)}
+            {suggestedQuestions && suggestedQuestions.length > 0 ? (
+              <div className="space-y-2">
+                {suggestedQuestions.map((question, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-2 p-2 sm:p-3 border rounded-lg hover:bg-muted/50 transition-colors group"
                   >
-                    <Send className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+                    <span className="text-xs sm:text-sm flex-1 text-foreground">{question}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8 opacity-70 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleSendQuestion(question)}
+                    >
+                      <Send className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                No questions generated yet. Click "Generate Questions" to create suggested questions.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -250,15 +364,10 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
           </TabsContent>
 
           {datasetType === 'pdf' && (
-            <TabsContent value="pdfPreview" className="mt-0 h-[calc(100vh-200px)]">
-              <Card className="h-full">
-                <CardContent className="p-0 h-full">
-                  <PDFViewer 
-                    pdfUrl="/placeholder.pdf" 
-                    pdfId={datasetId}
-                  />
-                </CardContent>
-              </Card>
+            <TabsContent value="pdfPreview" className="mt-0 h-[calc(100vh-200px)] overflow-hidden">
+              <div className="h-full overflow-auto">
+                <PDFViewer pdfId={datasetId} />
+              </div>
             </TabsContent>
           )}
 
@@ -320,17 +429,53 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
                   <CardTitle className="text-xl sm:text-2xl">Analysis Report</CardTitle>
                   <CardDescription className="text-xs sm:text-sm">Detailed insights from your data analysis</CardDescription>
                 </div>
-                <Button onClick={handleDownloadReport} variant="outline" className="gap-2 w-full sm:w-auto flex-shrink-0">
-                  <Download className="h-4 w-4" />
-                  Download Report
-                </Button>
+                <div className="flex gap-2">
+                  {datasetType === 'pdf' && (!dataset?.report_generated || !dataset?.report) && (
+                    <Button 
+                      onClick={handleGenerateReport} 
+                      variant="outline" 
+                      className="gap-2"
+                      disabled={isGeneratingReport}
+                    >
+                      {isGeneratingReport ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Generate Report
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {dataset?.report && (
+                    <Button onClick={handleDownloadReport} variant="outline" className="gap-2 w-full sm:w-auto flex-shrink-0">
+                      <Download className="h-4 w-4" />
+                      Download Report
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[500px] border rounded-lg p-6 bg-muted/30">
-                  <div className="prose prose-sm max-w-none">
-                    <p className="text-foreground whitespace-pre-wrap leading-relaxed">{reportText}</p>
+                {reportText ? (
+                  <ScrollArea className="h-[500px] border rounded-lg p-6 bg-muted/30">
+                    <div className="prose prose-sm max-w-none">
+                      <p className="text-foreground whitespace-pre-wrap leading-relaxed">{reportText}</p>
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="h-[500px] border rounded-lg flex items-center justify-center bg-muted/30">
+                    <div className="text-center space-y-4">
+                      <Sparkles className="h-12 w-12 text-muted-foreground mx-auto" />
+                      <div>
+                        <p className="text-muted-foreground font-medium">No report generated yet</p>
+                        <p className="text-sm text-muted-foreground mt-1">Click "Generate Report" to create an analysis report</p>
+                      </div>
+                    </div>
                   </div>
-                </ScrollArea>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Download, Search, ArrowUpDown, MoreVertical, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Calculator, Filter, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,8 +68,13 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
   const [editingCell, setEditingCell] = useState<{rowIndex: number, columnId: string} | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(1000);
   const { toast } = useToast();
+
+  // Reset to page 0 when page size changes
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [pageSize]);
 
   // Debounce global filter
   useEffect(() => {
@@ -83,13 +89,18 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
       try {
         setIsLoading(true);
         const offset = currentPage * pageSize;
+        // If pageSize is very large (all rows), fetch all data without limit
+        const limit = pageSize >= 1000000 ? undefined : pageSize;
+        const url = limit 
+          ? `/datasets/${csvId}/data?limit=${limit}&offset=${offset}`
+          : `/datasets/${csvId}/data?offset=${offset}`;
         const response = await apiRequest<{
           columns: string[];
           data: any[];
           total_rows: number;
           returned_rows: number;
           total_columns: number;
-        }>(`/datasets/${csvId}/data?limit=${pageSize}&offset=${offset}`);
+        }>(url);
         
         if (response && response.data && response.columns) {
           setData(response.data);
@@ -554,13 +565,17 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
       
       // Reload current page data to reflect saved changes
       const offset = currentPage * pageSize;
+      const limit = pageSize >= 1000000 ? undefined : pageSize;
+      const reloadUrl = limit 
+        ? `/datasets/${csvId}/data?limit=${limit}&offset=${offset}`
+        : `/datasets/${csvId}/data?offset=${offset}`;
       const pageDataResponse = await apiRequest<{
         columns: string[];
         data: any[];
         total_rows: number;
         returned_rows: number;
         total_columns: number;
-      }>(`/datasets/${csvId}/data?limit=${pageSize}&offset=${offset}`);
+      }>(reloadUrl);
       
       if (pageDataResponse && pageDataResponse.data) {
         setData(pageDataResponse.data);
@@ -741,13 +756,38 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
           <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
             <span className="font-medium">Total Rows: <span className="text-foreground">{totalRows || data.length}</span></span>
             <span className="font-medium">Total Columns: <span className="text-foreground">{columns.length || table.getAllColumns().length}</span></span>
-            {totalRows > pageSize && (
+            {totalRows > pageSize && pageSize < 1000000 && (
               <span className="font-medium">
                 Page: <span className="text-foreground">{currentPage + 1} of {Math.ceil(totalRows / pageSize)}</span>
               </span>
             )}
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Rows per page:</span>
+              <Select
+                value={pageSize >= 1000000 ? "all" : pageSize.toString()}
+                onValueChange={(value) => {
+                  if (value === "all") {
+                    setPageSize(1000000); // Large number to get all rows
+                  } else {
+                    setPageSize(parseInt(value));
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[120px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
+                  <SelectItem value="1000">1000</SelectItem>
+                  <SelectItem value="2000">2000</SelectItem>
+                  <SelectItem value="5000">5000</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          {totalRows > pageSize && (
+          {totalRows > pageSize && pageSize < 1000000 && (
             <div className="flex items-center gap-2 justify-center pt-2">
               <Button
                 variant="outline"
@@ -772,6 +812,13 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
                 Next
                 <ChevronRight className="h-4 w-4" />
               </Button>
+            </div>
+          )}
+          {pageSize >= 1000000 && totalRows > 0 && (
+            <div className="flex items-center justify-center pt-2">
+              <span className="text-sm text-muted-foreground">
+                Showing all {totalRows} rows
+              </span>
             </div>
           )}
         </div>

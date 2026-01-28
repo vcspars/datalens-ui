@@ -127,9 +127,12 @@ export interface DatasetResponse {
   id: number;
   name: string;
   type: 'pdf' | 'csv' | 'database';
-  summary: string;
-  report: string;
-  questions: string[];
+  summary?: string;
+  report?: string;
+  questions?: string[];
+  summary_generated?: boolean;
+  questions_generated?: boolean;
+  report_generated?: boolean;
   uploadedAt: string;
   size?: string;
   previewData?: any;
@@ -230,13 +233,12 @@ export const uploadPDF = async (formData: FormData): Promise<DatasetResponse> =>
     id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
     type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: `PDF document "${response.name}" uploaded successfully.`,
-    report: `# PDF Analysis Report\n\n## Document Overview\nDocument: ${response.name}\nSize: ${response.size}\n\n## Status\nUploaded and ready for analysis.`,
-    questions: [
-      'What are the main topics covered in this document?',
-      'Can you summarize the key findings?',
-      'What are the recommendations mentioned?',
-    ],
+    summary: response.summary,
+    report: response.report,
+    questions: response.questions,
+    summary_generated: response.summary_generated || false,
+    questions_generated: response.questions_generated || false,
+    report_generated: response.report_generated || false,
     uploadedAt: new Date(response.uploaded_at).toISOString(),
     size: response.size,
     _id: response.id, // Store MongoDB ObjectId for navigation
@@ -332,32 +334,30 @@ export const getDatasetById = async (id: number | string): Promise<DatasetRespon
     file_name: string;
     file_size: number;
     description?: string;
+    summary?: string;
+    questions?: string[];
+    report?: string;
+    summary_generated?: boolean;
+    questions_generated?: boolean;
+    report_generated?: boolean;
     uploaded_at: string;
     size: string;
   }>(`/datasets/${id}`);
   
   // Convert to expected format
   return {
-    id: parseInt(response.id) || Math.floor(Math.random() * 10000),
+    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
     type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: `${response.dataset_type.toUpperCase()} dataset "${response.name}". ${response.description || 'Uploaded and ready for analysis.'}`,
-    report: `# ${response.dataset_type.toUpperCase()} Analysis Report\n\n## Dataset Overview\nDataset: ${response.name}\nFile: ${response.file_name}\nSize: ${response.size}\n\n## Status\nUploaded and ready for analysis.`,
-    questions: response.dataset_type === 'csv' ? [
-      'What is the structure of this dataset?',
-      'Are there any missing values?',
-      'Can you identify any patterns or trends?',
-    ] : response.dataset_type === 'pdf' ? [
-      'What are the main topics covered in this document?',
-      'Can you summarize the key findings?',
-      'What are the recommendations mentioned?',
-    ] : [
-      'How many tables are in this database?',
-      'What is the total number of records?',
-      'Can you show the schema relationships?',
-    ],
+    summary: response.summary,
+    report: response.report,
+    questions: response.questions,
+    summary_generated: response.summary_generated || false,
+    questions_generated: response.questions_generated || false,
+    report_generated: response.report_generated || false,
     uploadedAt: new Date(response.uploaded_at).toISOString(),
     size: response.size,
+    _id: response.id,
   };
 };
 
@@ -397,6 +397,115 @@ export const hasVCSAccess = (): boolean => {
   // Check environment variable or config
   // For now, return true for demonstration
   // TODO: Replace with actual check
-  // return import.meta.env.VITE_VCS_USER === 'true';
+  //   return import.meta.env.VITE_VCS_USER === 'true';
   return true; // Set to false to hide VCS access
+};
+
+// Generate content endpoints
+export const generateSummary = async (datasetId: string | number): Promise<DatasetResponse> => {
+  const response = await apiRequest<{
+    id: string;
+    name: string;
+    dataset_type: 'pdf' | 'csv' | 'database';
+    file_name: string;
+    file_size: number;
+    description?: string;
+    summary?: string;
+    questions?: string[];
+    report?: string;
+    summary_generated: boolean;
+    questions_generated: boolean;
+    report_generated: boolean;
+    uploaded_at: string;
+    size: string;
+  }>(`/datasets/${datasetId}/generate/summary`, {
+    method: "POST",
+  });
+  
+  return {
+    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
+    name: response.name,
+    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    summary: response.summary,
+    report: response.report,
+    questions: response.questions,
+    summary_generated: response.summary_generated,
+    questions_generated: response.questions_generated,
+    report_generated: response.report_generated,
+    uploadedAt: new Date(response.uploaded_at).toISOString(),
+    size: response.size,
+    _id: response.id,
+  };
+};
+
+export const generateQuestions = async (datasetId: string | number): Promise<DatasetResponse> => {
+  const response = await apiRequest<{
+    id: string;
+    name: string;
+    dataset_type: 'pdf' | 'csv' | 'database';
+    file_name: string;
+    file_size: number;
+    description?: string;
+    summary?: string;
+    questions?: string[];
+    report?: string;
+    summary_generated: boolean;
+    questions_generated: boolean;
+    report_generated: boolean;
+    uploaded_at: string;
+    size: string;
+  }>(`/datasets/${datasetId}/generate/questions`, {
+    method: "POST",
+  });
+  
+  return {
+    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
+    name: response.name,
+    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    summary: response.summary,
+    report: response.report,
+    questions: response.questions,
+    summary_generated: response.summary_generated,
+    questions_generated: response.questions_generated,
+    report_generated: response.report_generated,
+    uploadedAt: new Date(response.uploaded_at).toISOString(),
+    size: response.size,
+    _id: response.id,
+  };
+};
+
+export const generateReport = async (datasetId: string | number): Promise<DatasetResponse> => {
+  const response = await apiRequest<{
+    id: string;
+    name: string;
+    dataset_type: 'pdf' | 'csv' | 'database';
+    file_name: string;
+    file_size: number;
+    description?: string;
+    summary?: string;
+    questions?: string[];
+    report?: string;
+    summary_generated: boolean;
+    questions_generated: boolean;
+    report_generated: boolean;
+    uploaded_at: string;
+    size: string;
+  }>(`/datasets/${datasetId}/generate/report`, {
+    method: "POST",
+  });
+  
+  return {
+    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
+    name: response.name,
+    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    summary: response.summary,
+    report: response.report,
+    questions: response.questions,
+    summary_generated: response.summary_generated,
+    questions_generated: response.questions_generated,
+    report_generated: response.report_generated,
+    uploadedAt: new Date(response.uploaded_at).toISOString(),
+    size: response.size,
+    _id: response.id,
+  };
 };

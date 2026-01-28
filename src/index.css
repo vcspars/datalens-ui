@@ -111,3 +111,58 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* React-PDF styles - ensure canvas fits content without extra space */
+.react-pdf__Document {
+  display: flex;
+  justify-content: center;
+}
+
+.react-pdf__Page {
+  display: block !important;
+  background: transparent !important;
+  position: relative;
+}
+
+.react-pdf__Page__canvas {
+  display: block !important;
+  margin: 0 auto;
+}
+
+.react-pdf__Page__textContent {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  line-height: 1;
+  user-select: text;
+  pointer-events: none;
+}
+
+.react-pdf__Page__textContent span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0% 0%;
+}
+
+/* PDF search highlight styles */
+.react-pdf__Page__textContent .pdf-highlight,
+.react-pdf__Page__textContent span.pdf-highlight,
+.react-pdf__Page__textContent mark.pdf-highlight {
+  background-color: rgba(250, 204, 21, 0.8) !important;
+  color: transparent !important;
+  padding: 1px 2px !important;
+  margin: 0 !important;
+  border-radius: 2px !important;
+  display: inline !important;
+  position: relative !important;
+  z-index: 10 !important;
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.3) !important;
+}
+
+.react-pdf__Page__annotations {
+  display: none;
+}

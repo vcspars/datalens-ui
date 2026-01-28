@@ -8,6 +8,7 @@ import { FileText, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { uploadPDF } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface UploadPDFDialogProps {
   open: boolean;
@@ -19,6 +20,9 @@ export default function UploadPDFDialog({ open, onOpenChange }: UploadPDFDialogP
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [generateSummary, setGenerateSummary] = useState(true);
+  const [generateQuestions, setGenerateQuestions] = useState(true);
+  const [generateReport, setGenerateReport] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -67,6 +71,9 @@ export default function UploadPDFDialog({ open, onOpenChange }: UploadPDFDialogP
       if (description) {
         formData.append("description", description);
       }
+      formData.append("generate_summary", generateSummary.toString());
+      formData.append("generate_questions", generateQuestions.toString());
+      formData.append("generate_report", generateReport.toString());
 
       const response = await uploadPDF(formData);
       
@@ -100,6 +107,9 @@ export default function UploadPDFDialog({ open, onOpenChange }: UploadPDFDialogP
     setName("");
     setDescription("");
     setFile(null);
+    setGenerateSummary(true);
+    setGenerateQuestions(true);
+    setGenerateReport(true);
   };
 
   return (
@@ -160,6 +170,57 @@ export default function UploadPDFDialog({ open, onOpenChange }: UploadPDFDialogP
               disabled={isLoading}
               rows={3}
             />
+          </div>
+
+          <div className="space-y-3 border-t pt-4">
+            <Label>Generate Content (Select what to generate)</Label>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="generate-summary"
+                  checked={generateSummary}
+                  onCheckedChange={(checked) => setGenerateSummary(checked === true)}
+                  disabled={isLoading}
+                />
+                <Label
+                  htmlFor="generate-summary"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Generate Summary
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="generate-questions"
+                  checked={generateQuestions}
+                  onCheckedChange={(checked) => setGenerateQuestions(checked === true)}
+                  disabled={isLoading}
+                />
+                <Label
+                  htmlFor="generate-questions"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Generate Questions
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="generate-report"
+                  checked={generateReport}
+                  onCheckedChange={(checked) => setGenerateReport(checked === true)}
+                  disabled={isLoading}
+                />
+                <Label
+                  htmlFor="generate-report"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Generate Report
+                </Label>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You can generate missing content later from the overview page
+            </p>
           </div>
         </div>
 
