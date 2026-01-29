@@ -37,13 +37,15 @@ interface CSVPreviewProps {
 }
 
 interface ColumnChange {
-  type: 'add' | 'modify' | 'delete';
+  type: 'add' | 'modify' | 'delete' | 'format';
   columnName: string;
   data?: any[];
   position?: number;
   rowIndex?: number;
   oldValue?: any;
   newValue?: any;
+  formatType?: 'align' | 'display';
+  formatValue?: 'left' | 'center' | 'right' | 'currency' | 'percentage';
 }
 
 export default function CSVPreview({ csvId, onPendingChangesChange, onRequestConfirm }: CSVPreviewProps) {
@@ -69,6 +71,7 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
   const [editingValue, setEditingValue] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(1000);
+  const [columnDisplayFormat, setColumnDisplayFormat] = useState<Record<string, { align?: 'left' | 'center' | 'right'; format?: 'currency' | 'percentage' }>>({});
   const { toast } = useToast();
 
   // Reset to page 0 when page size changes
@@ -83,6 +86,28 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
     }, 300);
     return () => clearTimeout(timer);
   }, [globalFilter]);
+
+  // Load column display format from localStorage on mount
+  useEffect(() => {
+    const storageKey = `columnFormat_${csvId}`;
+    const savedFormat = localStorage.getItem(storageKey);
+    if (savedFormat) {
+      try {
+        const parsed = JSON.parse(savedFormat);
+        setColumnDisplayFormat(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved column format:", e);
+      }
+    }
+  }, [csvId]);
+
+  // Save column display format to localStorage when it changes
+  useEffect(() => {
+    if (Object.keys(columnDisplayFormat).length > 0) {
+      const storageKey = `columnFormat_${csvId}`;
+      localStorage.setItem(storageKey, JSON.stringify(columnDisplayFormat));
+    }
+  }, [columnDisplayFormat, csvId]);
 
   useEffect(() => {
     const loadCSVData = async () => {
@@ -224,6 +249,7 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
       cell: ({ row, column }: any) => {
         const value = row.original[column.id];
         const isEditing = editingCell?.rowIndex === row.index && editingCell?.columnId === column.id;
+        const displayFormat = columnDisplayFormat[column.id];
         
         return (
           <EditableCell
@@ -234,11 +260,13 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
             onEdit={handleCellEdit}
             onSave={handleCellSave}
             onCancel={handleCellCancel}
+            align={displayFormat?.align}
+            format={displayFormat?.format}
           />
         );
       },
     }));
-  }, [columns, editingCell, handleCellEdit, handleCellSave, handleCellCancel]);
+  }, [columns, editingCell, columnDisplayFormat, handleCellEdit, handleCellSave, handleCellCancel]);
 
   // Use memoized columns if available, otherwise fall back to regular columns
   const tableColumns = memoizedColumns.length > 0 ? memoizedColumns : columns;
@@ -348,7 +376,67 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
 
   const handleColumnAction = useCallback(async (action: string, columnId: string) => {
     try {
-      // Map action names to backend operation names
+      // Display-only actions (formatting) - track in pending changes
+      if (action === 'Align Left' || action === 'Align Center' || action === 'Align Right') {
+        const align = action === 'Align Left' ? 'left' : action === 'Align Center' ? 'center' : 'right';
+        const oldAlign = columnDisplayFormat[columnId]?.align;
+        
+        // Only track if alignment actually changed
+        if (oldAlign !== align) {
+          setColumnDisplayFormat((prev) => ({ ...prev, [columnId]: { ...prev[columnId], align } }));
+          setPendingChanges((prev) => {
+            // Remove existing format change for this column's alignment, if any
+            const filtered = prev.filter(c => 
+              !(c.type === 'format' && c.columnName === columnId && c.formatType === 'align')
+            );
+            const next = [...filtered, { 
+              type: 'format' as const, 
+              columnName: columnId,
+              formatType: 'align' as const,
+              formatValue: align,
+              oldValue: oldAlign,
+              newValue: align,
+            }];
+            onPendingChangesChange?.(true, next);
+            return next;
+          });
+          toast({ title: "Format applied", description: `Column "${columnId}" aligned ${align}` });
+        } else {
+          toast({ title: "No change", description: `Column "${columnId}" is already aligned ${align}` });
+        }
+        return;
+      }
+      if (action === 'Format as Currency' || action === 'Format as Percentage') {
+        const format = action === 'Format as Currency' ? 'currency' : 'percentage';
+        const oldFormat = columnDisplayFormat[columnId]?.format;
+        
+        // Only track if format actually changed
+        if (oldFormat !== format) {
+          setColumnDisplayFormat((prev) => ({ ...prev, [columnId]: { ...prev[columnId], format } }));
+          setPendingChanges((prev) => {
+            // Remove existing format change for this column's display format, if any
+            const filtered = prev.filter(c => 
+              !(c.type === 'format' && c.columnName === columnId && c.formatType === 'display')
+            );
+            const next = [...filtered, { 
+              type: 'format' as const, 
+              columnName: columnId,
+              formatType: 'display' as const,
+              formatValue: format,
+              oldValue: oldFormat,
+              newValue: format,
+            }];
+            onPendingChangesChange?.(true, next);
+            return next;
+          });
+          toast({ title: "Format applied", description: `Column "${columnId}" formatted as ${format}` });
+        } else {
+          toast({ title: "No change", description: `Column "${columnId}" is already formatted as ${format}` });
+        }
+        return;
+      }
+
+      // Map action names to backend operation names (statistics - show in modal)
       const operationMap: Record<string, string> = {
         'Calculate Sum': 'sum',
         'Calculate Average': 'average',
@@ -359,55 +447,229 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
         'Calculate Variance': 'variance',
         'Calculate Mode': 'mode',
         'Calculate Range': 'range',
+        'Calculate Percentiles': 'percentiles',
       };
-      
-      const operation = operationMap[action] || action.toLowerCase();
-      
-      if (!operationMap[action] && !['sum', 'average', 'median', 'min', 'max', 'min/max', 'standard deviation', 'variance', 'mode', 'range', 'count unique', 'count'].includes(operation)) {
-        toast({
-          title: "Action not implemented",
-          description: `${action} is not yet available`,
-          variant: "destructive",
+
+      const operation = operationMap[action];
+      const backendStats = ['sum', 'average', 'median', 'min/max', 'standard deviation', 'count unique', 'variance', 'mode', 'range', 'percentiles'];
+
+      if (operation && backendStats.includes(operation)) {
+        const response = await apiRequest<{
+          column: string;
+          operation: string;
+          result: { value?: number; min?: number; max?: number; formatted: string; p25?: number; p50?: number; p75?: number };
+          total_values: number;
+          valid_numeric_values: number;
+        }>(`/datasets/${csvId}/column/calculate`, {
+          method: "POST",
+          body: JSON.stringify({ column_name: columnId, operation }),
         });
+        setCalculationResult({
+          columnName: response.column,
+          operation: response.operation,
+          result: response.result,
+          totalValues: response.total_values,
+          validNumericValues: response.valid_numeric_values,
+        });
+        setCalculationModalOpen(true);
         return;
       }
-      
-      // Call backend API for calculation
-      const response = await apiRequest<{
-        column: string;
-        operation: string;
-        result: {
-          value?: number;
-          min?: number;
-          max?: number;
-          formatted: string;
-        };
-        total_values: number;
-        valid_numeric_values: number;
-      }>(`/datasets/${csvId}/column/calculate`, {
-        method: "POST",
-        body: JSON.stringify({
-          column_name: columnId,
-          operation: operation,
-        }),
+
+      // Data-modifying actions (client-side on current data, add to pending)
+      const colValues = data.map((row) => row[columnId]);
+      const numericValues = colValues.map((v) => (v !== null && v !== undefined && v !== '' ? Number(v) : NaN)).filter((n) => !Number.isNaN(n));
+      const num = numericValues.length;
+
+      if (action === 'Remove Outliers') {
+        if (num < 4) {
+          toast({ title: "Not enough data", description: "Need at least 4 numeric values for IQR.", variant: "destructive" });
+          return;
+        }
+        const sorted = [...numericValues].sort((a, b) => a - b);
+        const q1 = sorted[Math.floor(num * 0.25)];
+        const q3 = sorted[Math.floor(num * 0.75)];
+        const iqr = q3 - q1;
+        const low = q1 - 1.5 * iqr;
+        const high = q3 + 1.5 * iqr;
+        const newData = data.filter((row) => {
+          const v = row[columnId];
+          const n = Number(v);
+          if (v === null || v === undefined || v === '' || Number.isNaN(n)) return true;
+          return n >= low && n <= high;
+        });
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Outliers removed", description: `Filtered to ${newData.length} rows (IQR). Export or confirm to save.` });
+        return;
+      }
+
+      if (action === 'Remove Duplicates') {
+        const seen = new Set<string>();
+        const newData = data.filter((row) => {
+          const key = String(row[columnId] ?? '');
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Duplicates removed", description: `Kept ${newData.length} unique rows. Export or confirm to save.` });
+        return;
+      }
+
+      if (action === 'Fill Missing Values') {
+        const mean = num > 0 ? numericValues.reduce((a, b) => a + b, 0) / num : 0;
+        const newData = data.map((row) => ({
+          ...row,
+          [columnId]: row[columnId] === null || row[columnId] === undefined || row[columnId] === '' ? mean : row[columnId],
+        }));
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Missing values filled", description: `Filled with mean (${mean.toFixed(2)}). Confirm changes to save.` });
+        return;
+      }
+
+      if (action === 'Normalize Data') {
+        if (num === 0) {
+          toast({ title: "No numeric values", description: "Column has no numeric values to normalize.", variant: "destructive" });
+          return;
+        }
+        const min = Math.min(...numericValues);
+        const max = Math.max(...numericValues);
+        const range = max - min || 1;
+        const newData = data.map((row) => {
+          const v = row[columnId];
+          const n = Number(v);
+          if (v === null || v === undefined || v === '' || Number.isNaN(n)) return row;
+          return { ...row, [columnId]: (n - min) / range };
+        });
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Data normalized", description: "Min-max scaled to [0, 1]. Confirm changes to save." });
+        return;
+      }
+
+      if (action === 'Standardize Data' || action === 'Standardize Data (Z-Score)') {
+        if (num < 2) {
+          toast({ title: "Not enough data", description: "Need at least 2 values for z-score.", variant: "destructive" });
+          return;
+        }
+        const mean = numericValues.reduce((a, b) => a + b, 0) / num;
+        const variance = numericValues.reduce((s, x) => s + (x - mean) ** 2, 0) / num;
+        const std = Math.sqrt(variance) || 1;
+        const newData = data.map((row) => {
+          const v = row[columnId];
+          const n = Number(v);
+          if (v === null || v === undefined || v === '' || Number.isNaN(n)) return row;
+          return { ...row, [columnId]: (n - mean) / std };
+        });
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Data standardized", description: "Z-score applied. Confirm changes to save." });
+        return;
+      }
+
+      if (action === 'Log Transform') {
+        if (num === 0) {
+          toast({ title: "No numeric values", description: "Column has no numeric values.", variant: "destructive" });
+          return;
+        }
+        const newData = data.map((row) => {
+          const v = row[columnId];
+          const n = Number(v);
+          if (v === null || v === undefined || v === '' || Number.isNaN(n)) return row;
+          return { ...row, [columnId]: Math.log(Math.max(0, n) + 1) };
+        });
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Log transform applied", description: "log(x+1). Confirm changes to save." });
+        return;
+      }
+
+      if (action === 'Square Root Transform') {
+        if (num === 0) {
+          toast({ title: "No numeric values", description: "Column has no numeric values.", variant: "destructive" });
+          return;
+        }
+        const newData = data.map((row) => {
+          const v = row[columnId];
+          const n = Number(v);
+          if (v === null || v === undefined || v === '' || Number.isNaN(n)) return row;
+          return { ...row, [columnId]: Math.sqrt(Math.max(0, n)) };
+        });
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Square root applied", description: "sqrt(x). Confirm changes to save." });
+        return;
+      }
+
+      if (action === 'Bin Data' || action === 'Bin/Group Data') {
+        if (num === 0) {
+          toast({ title: "No numeric values", description: "Column has no numeric values.", variant: "destructive" });
+          return;
+        }
+        const bins = 5;
+        const minVal = Math.min(...numericValues);
+        const maxVal = Math.max(...numericValues);
+        const step = (maxVal - minVal) / bins || 1;
+        const newData = data.map((row) => {
+          const v = row[columnId];
+          const n = Number(v);
+          if (v === null || v === undefined || v === '' || Number.isNaN(n)) return row;
+          const binIndex = Math.min(Math.floor((n - minVal) / step), bins - 1);
+          return { ...row, [columnId]: `Bin ${binIndex + 1} (${(minVal + binIndex * step).toFixed(1)}-${(minVal + (binIndex + 1) * step).toFixed(1)})` };
+        });
+        setData(newData);
+        setPendingChanges((prev) => {
+          const next = [...prev, { type: 'modify' as const, columnName: columnId }];
+          onPendingChangesChange?.(true, next);
+          return next;
+        });
+        toast({ title: "Data binned", description: `${bins} equal-width bins. Confirm changes to save.` });
+        return;
+      }
+
+      toast({
+        title: "Action not found",
+        description: `"${action}" could not be applied.`,
+        variant: "destructive",
       });
-      
-      setCalculationResult({
-        columnName: response.column,
-        operation: response.operation,
-        result: response.result,
-        totalValues: response.total_values,
-        validNumericValues: response.valid_numeric_values,
-      });
-      setCalculationModalOpen(true);
     } catch (error: any) {
       toast({
-        title: "Calculation failed",
-        description: error?.message || "Failed to calculate statistic",
+        title: "Action failed",
+        description: error?.message || "Something went wrong",
         variant: "destructive",
       });
     }
-  }, [csvId, toast]);
+  }, [csvId, data, columnDisplayFormat, onPendingChangesChange, toast]);
   
   const handleAddColumn = useCallback((position: 'left' | 'right', columnId: string) => {
     // Store the pending column add info and show dialog
