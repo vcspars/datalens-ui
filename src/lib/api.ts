@@ -293,22 +293,54 @@ export const uploadCSV = async (formData: FormData): Promise<DatasetResponse> =>
   };
 };
 
+export const uploadDatabase = async (formData: FormData): Promise<DatasetResponse> => {
+  const response = await apiRequest<{
+    id: string;
+    name: string;
+    dataset_type: 'pdf' | 'csv' | 'database';
+    file_name: string;
+    file_size: number;
+    description?: string;
+    uploaded_at: string;
+    size: string;
+  }>("/datasets/upload/database", {
+    method: "POST",
+    body: formData,
+    headers: {},
+  });
+
+  if (!response || !response.id) {
+    throw new Error("Invalid response from server");
+  }
+
+  return {
+    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
+    name: response.name,
+    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    summary: `Database "${response.name}" connected successfully.`,
+    report: `# Database Report\n\n## Overview\nDatabase: ${response.name}\nSize: ${response.size}\n\n## Status\nConnected and ready for analysis.`,
+    questions: [],
+    uploadedAt: new Date(response.uploaded_at).toISOString(),
+    size: response.size,
+    _id: response.id,
+  };
+};
+
 export const connectDatabase = async (data: {
   name: string;
   file?: File;
   useVCSAccess?: boolean;
 }): Promise<DatasetResponse> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // TODO: Replace with actual API call
-  // const response = await fetch('/api/connect-database', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  //   headers: { 'Content-Type': 'application/json' }
-  // });
-  // return await response.json();
-  
+  // If file is provided, upload to backend
+  if (data.file) {
+    const formData = new FormData();
+    formData.append("name", data.name);
+    formData.append("file", data.file);
+    return uploadDatabase(formData);
+  }
+
+  // VCS / no file: use mock for now (no backend for VCS yet)
+  await new Promise(resolve => setTimeout(resolve, 1500));
   return generateDummyResponse(data.name, 'database');
 };
 
@@ -395,6 +427,34 @@ export const saveDatasetChanges = async (
       data,
     }),
   });
+};
+
+export interface AddIntelligentColumnRequest {
+  source_columns: string[];
+  prompt: string;
+  new_column_name: string;
+}
+
+export interface AddIntelligentColumnResponse {
+  success: boolean;
+  new_column_name: string;
+  new_column_data: string[];
+  message: string;
+  row_count: number;
+  column_count: number;
+}
+
+export const addIntelligentColumn = async (
+  datasetId: string,
+  payload: AddIntelligentColumnRequest
+): Promise<AddIntelligentColumnResponse> => {
+  return await apiRequest<AddIntelligentColumnResponse>(
+    `/datasets/${datasetId}/add-intelligent-column`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 };
 
 // Check if VCS special access is enabled

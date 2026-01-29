@@ -11,9 +11,15 @@ interface EditableCellProps {
   onCancel: () => void;
   align?: 'left' | 'center' | 'right';
   format?: 'currency' | 'percentage';
+  /** Use thousands separators for plain numbers (when align is right / numeric column) */
+  useThousandsSeparator?: boolean;
 }
 
-function formatDisplayValue(value: any, format?: 'currency' | 'percentage'): string {
+function formatDisplayValue(
+  value: any,
+  format?: 'currency' | 'percentage',
+  useThousandsForNumbers?: boolean
+): string {
   if (value === null || value === undefined) return '';
   const num = Number(value);
   if (format === 'currency' && !Number.isNaN(num)) {
@@ -21,6 +27,12 @@ function formatDisplayValue(value: any, format?: 'currency' | 'percentage'): str
   }
   if (format === 'percentage' && !Number.isNaN(num)) {
     return `${num.toFixed(2)}%`;
+  }
+  if (useThousandsForNumbers && !Number.isNaN(num) && String(value).trim() !== '') {
+    return new Intl.NumberFormat('en-US', {
+      maximumFractionDigits: 10,
+      minimumFractionDigits: Number.isInteger(num) ? 0 : undefined,
+    }).format(num);
   }
   return String(value);
 }
@@ -35,6 +47,7 @@ const EditableCell = React.memo<EditableCellProps>(({
   onCancel,
   align = 'left',
   format,
+  useThousandsSeparator = false,
 }) => {
   const [localValue, setLocalValue] = useState(value || "");
 
@@ -65,7 +78,7 @@ const EditableCell = React.memo<EditableCellProps>(({
   }
 
   const alignClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
-  const displayValue = formatDisplayValue(value, format);
+  const displayValue = formatDisplayValue(value, format, useThousandsSeparator);
 
   return (
     <div

@@ -73,8 +73,9 @@ export default function ConnectDatabaseDialog({ open, onOpenChange }: ConnectDat
         description: `${name} has been connected and is ready to use.`,
       });
 
-      // Navigate to the dashboard with the new dataset
-      navigate(`/dashboard/database/${response.id}`);
+      // Navigate to the dashboard with the new dataset (use _id for MongoDB ObjectId)
+      const datasetId = response._id ?? response.id;
+      navigate(`/dashboard/database/${typeof datasetId === 'number' ? String(datasetId) : datasetId}`);
       onOpenChange(false);
       resetForm();
     } catch (error) {
