@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Database, FileText, Sheet, MessageSquare, BarChart3, LayoutDashboard } from "lucide-react";
+import { FileText, Sheet, MessageSquare, BarChart3, LayoutDashboard } from "lucide-react";
 
 export default function Help() {
   return (
@@ -25,7 +25,7 @@ export default function Help() {
             <CardContent className="prose prose-sm max-w-none">
               <p>
                 DataLens helps you analyze and visualize your data through natural conversation.
-                Connect your data sources (PDFs, CSV files, or databases) and start asking questions.
+                Connect your data sources (PDFs and CSV/Excel files) and start asking questions.
               </p>
             </CardContent>
           </Card>
@@ -36,15 +36,6 @@ export default function Help() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
-                <div className="flex gap-3">
-                  <Database className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                  <div>
-                    <h4 className="font-semibold mb-1">Database Connection</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Connect to your databases and query them using natural language
-                    </p>
-                  </div>
-                </div>
                 <div className="flex gap-3">
                   <FileText className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
                   <div>
@@ -101,21 +92,13 @@ export default function Help() {
             <CardContent>
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="item-1">
-                  <AccordionTrigger>How do I connect a database?</AccordionTrigger>
-                  <AccordionContent>
-                    Click on "My Datasets" in the header, then select "Connect New Dataset".
-                    Choose "Database" and enter your connection details. DataLens supports
-                    PostgreSQL, MySQL, and SQLite databases.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-2">
                   <AccordionTrigger>What file formats are supported?</AccordionTrigger>
                   <AccordionContent>
                     DataLens supports PDF files for document analysis, and CSV/Excel files
                     for structured data analysis. Maximum file size is 50MB.
                   </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="item-3">
+                <AccordionItem value="item-2">
                   <AccordionTrigger>How do I save visualizations?</AccordionTrigger>
                   <AccordionContent>
                     When a chart or table is generated, you'll see a save button. Click it

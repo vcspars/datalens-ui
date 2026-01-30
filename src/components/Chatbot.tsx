@@ -16,7 +16,7 @@ interface Message {
 
 interface ChatbotProps {
   datasetId?: number;
-  datasetType?: 'pdf' | 'csv' | 'database';
+  datasetType?: 'pdf' | 'csv';
   externalQuestion?: string;
   onQuestionSent?: () => void;
   isFullscreen?: boolean;
@@ -29,8 +29,7 @@ export default function Chatbot({ datasetId, datasetType, externalQuestion, onQu
   const getWelcomeMessage = () => {
     const messages = {
       csv: "• Analyze trends and patterns in your CSV data\n• Generate insights from spreadsheet columns\n• Query specific data points and aggregations",
-      pdf: "• Extract and analyze information from documents\n• Search through PDF content intelligently\n• Summarize key findings from your files",
-      database: "• Query your database with natural language\n• Explore relationships between tables\n• Generate complex data analysis reports"
+      pdf: "• Extract and analyze information from documents\n• Search through PDF content intelligently\n• Summarize key findings from your files"
     };
     
     return `Welcome to DataLens! I can help you with:\n\n${messages[datasetType || 'csv']}`;
@@ -89,9 +88,7 @@ export default function Chatbot({ datasetId, datasetType, externalQuestion, onQu
       // Call appropriate chat API based on dataset type
       const endpoint = datasetType === 'pdf' 
         ? '/api/chat/chat_with_pdf'
-        : datasetType === 'csv'
-        ? '/api/chat/chat_with_csv/'
-        : '/api/chat/chat_with_database/';
+        : '/api/chat/chat_with_csv/';
 
       // Mock response for now - simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));

@@ -5,7 +5,7 @@ import LandingHeader from "@/components/LandingHeader";
 import LandingFooter from "@/components/LandingFooter";
 import { 
   FileText, 
-  Database, 
+  Sheet, 
   BarChart3, 
   Sparkles, 
   Zap, 
@@ -29,7 +29,7 @@ export default function Homepage() {
       description: "Upload and analyze PDF documents with AI-powered text extraction, summarization, and intelligent Q&A.",
     },
     {
-      icon: Database,
+      icon: Sheet,
       title: "CSV/Excel Processing",
       description: "Process and analyze spreadsheet data with advanced calculations, filtering, and data manipulation tools.",
     },

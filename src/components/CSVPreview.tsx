@@ -49,61 +49,6 @@ interface ColumnChange {
   formatValue?: 'left' | 'center' | 'right' | 'currency' | 'percentage';
 }
 
-type AlignType = "left" | "center" | "right";
-
-/** Infer default column alignment from data: text → left, numbers → right, short codes/IDs/status → center */
-function inferDefaultColumnAlignment(
-  columnNames: string[],
-  data: any[],
-  sampleSize = 200
-): Record<string, AlignType> {
-  const result: Record<string, AlignType> = {};
-  const numericKeywords = /\b(price|amount|total|sum|quantity|count|number|percent|rate|idle|time|score|rpm|consumption|variation|smoothness)\b/i;
-  const idLikeKeywords = /\b(id|code|status|flag|type)\b/i;
-
-  for (const colName of columnNames) {
-    const values = data
-      .map((row) => row[colName])
-      .filter((v) => v !== null && v !== undefined && v !== "");
-    const sample = values.slice(0, sampleSize);
-    if (sample.length === 0) {
-      result[colName] = "left";
-      continue;
-    }
-
-    const numericCount = sample.filter((v) => {
-      if (typeof v === "number" && !Number.isNaN(v)) return true;
-      const s = String(v).trim();
-      if (!s) return false;
-      const n = Number(s);
-      return !Number.isNaN(n) && s !== "";
-    }).length;
-    const numericRatio = numericCount / sample.length;
-
-    if (numericRatio >= 0.5) {
-      result[colName] = "right";
-      continue;
-    }
-
-    const maxLen = Math.max(...sample.map((v) => String(v).length));
-    const avgLen = sample.reduce((sum, v) => sum + String(v).length, 0) / sample.length;
-    const shortCodeLike =
-      maxLen <= 20 &&
-      (idLikeKeywords.test(colName) ||
-        sample.every((v) => {
-          const s = String(v).trim().toLowerCase();
-          return s.length <= 15 || /^(yes|no|active|inactive|pending|done|true|false|\d+)$/i.test(s);
-        }));
-
-    if (shortCodeLike && avgLen <= 12) {
-      result[colName] = "center";
-    } else {
-      result[colName] = "left";
-    }
-  }
-  return result;
-}
-
 export default function CSVPreview({ csvId, onPendingChangesChange, onRequestConfirm }: CSVPreviewProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -128,13 +73,32 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(1000);
   const [columnDisplayFormat, setColumnDisplayFormat] = useState<Record<string, { align?: 'left' | 'center' | 'right'; format?: 'currency' | 'percentage' }>>({});
-  const [defaultColumnAlignment, setDefaultColumnAlignment] = useState<Record<string, AlignType>>({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const { toast } = useToast();
 
-  const DEFAULT_COL_WIDTH = 150;
-  const MIN_COL_WIDTH = 60;
-  const MAX_COL_WIDTH = 800;
+  // Load column sizing from localStorage on mount
+  useEffect(() => {
+    const storageKey = `columnSizing_${csvId}`;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as ColumnSizingState;
+        setColumnSizing(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved column sizing:", e);
+      }
+    } else {
+      setColumnSizing({});
+    }
+  }, [csvId]);
+
+  // Save column sizing to localStorage when it changes
+  useEffect(() => {
+    if (Object.keys(columnSizing).length > 0) {
+      const storageKey = `columnSizing_${csvId}`;
+      localStorage.setItem(storageKey, JSON.stringify(columnSizing));
+    }
+  }, [columnSizing, csvId]);
 
   // Reset to page 0 when page size changes
   useEffect(() => {
@@ -171,37 +135,6 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
     }
   }, [columnDisplayFormat, csvId]);
 
-  // Load column widths from localStorage on mount
-  useEffect(() => {
-    const storageKey = `columnWidths_${csvId}`;
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as ColumnSizingState;
-        if (typeof parsed === "object" && parsed !== null) {
-          setColumnSizing(parsed);
-        }
-      } catch {
-        // ignore
-      }
-    }
-  }, [csvId]);
-
-  // Save column widths to localStorage when they change
-  const handleColumnSizingChange = useCallback(
-    (updater: (old: ColumnSizingState) => ColumnSizingState) => {
-      setColumnSizing((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : updater;
-        const storageKey = `columnWidths_${csvId}`;
-        if (Object.keys(next).length > 0) {
-          localStorage.setItem(storageKey, JSON.stringify(next));
-        }
-        return next;
-      });
-    },
-    [csvId]
-  );
-
   useEffect(() => {
     const loadCSVData = async () => {
       try {
@@ -223,10 +156,10 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
         if (response && response.data && response.columns) {
           setData(response.data);
           setTotalRows(response.total_rows || response.data.length);
-          const columnNames = response.columns || [];
-          setDefaultColumnAlignment(inferDefaultColumnAlignment(columnNames, response.data));
-
+          
           // Store column names - only update columns if they changed
+          const columnNames = response.columns || [];
+          
           // Always update columns on first load or if structure changed
           setColumns((prevColumns) => {
             const prevColumnIds = prevColumns.map(c => c.id as string);
@@ -240,6 +173,9 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
                 id: colName,
                 accessorKey: colName,
                 header: colName,
+                size: 150,
+                minSize: 60,
+                maxSize: 800,
               }));
             }
             return prevColumns;
@@ -259,6 +195,9 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
                 id: colName,
                 accessorKey: colName,
                 header: colName,
+                size: 150,
+                minSize: 60,
+                maxSize: 800,
               }));
             }
             return prevOriginal;
@@ -333,31 +272,17 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
     setEditingValue("");
   }, []);
 
-  // Resolved alignment: user override (columnDisplayFormat) > inferred default > left
-  const getResolvedAlign = useCallback(
-    (columnId: string): AlignType =>
-      columnDisplayFormat[columnId]?.align ?? defaultColumnAlignment[columnId] ?? "left",
-    [columnDisplayFormat, defaultColumnAlignment]
-  );
-
-  // Memoize column definitions with EditableCell and resizable widths
+  // Memoize column definitions with EditableCell
   const memoizedColumns = useMemo(() => {
     if (columns.length === 0) return [];
     
     return columns.map((col) => ({
       ...col,
-      size: DEFAULT_COL_WIDTH,
-      minSize: MIN_COL_WIDTH,
-      maxSize: MAX_COL_WIDTH,
       cell: ({ row, column }: any) => {
         const value = row.original[column.id];
         const isEditing = editingCell?.rowIndex === row.index && editingCell?.columnId === column.id;
         const displayFormat = columnDisplayFormat[column.id];
         
-        const resolvedAlign = getResolvedAlign(column.id);
-        const useThousands =
-          (resolvedAlign === "right" && !displayFormat?.format) ||
-          (defaultColumnAlignment[column.id] === "right" && !displayFormat?.format);
         return (
           <EditableCell
             value={value}
@@ -367,14 +292,13 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
             onEdit={handleCellEdit}
             onSave={handleCellSave}
             onCancel={handleCellCancel}
-            align={resolvedAlign}
+            align={displayFormat?.align}
             format={displayFormat?.format}
-            useThousandsSeparator={useThousands}
           />
         );
       },
     }));
-  }, [columns, editingCell, columnDisplayFormat, defaultColumnAlignment, getResolvedAlign, handleCellEdit, handleCellSave, handleCellCancel]);
+  }, [columns, editingCell, columnDisplayFormat, handleCellEdit, handleCellSave, handleCellCancel]);
 
   // Use memoized columns if available, otherwise fall back to regular columns
   const tableColumns = memoizedColumns.length > 0 ? memoizedColumns : columns;
@@ -391,12 +315,12 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setDebouncedGlobalFilter,
-    onColumnSizingChange: handleColumnSizingChange,
+    onColumnSizingChange: setColumnSizing,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     enableColumnResizing: true,
-    columnResizeMode: "onChange",
+    columnResizeMode: 'onChange',
   });
 
   const handleExport = useCallback(async () => {
@@ -814,6 +738,9 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
       id: columnName,
       accessorKey: columnName,
       header: columnName,
+      size: 150,
+      minSize: 60,
+      maxSize: 800,
     };
     
     const currentCols = [...columns];
@@ -859,6 +786,9 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
       id: newColumnName,
       accessorKey: newColumnName,
       header: newColumnName,
+      size: 150,
+      minSize: 60,
+      maxSize: 800,
     };
     
     const colIndex = columns.findIndex(col => col.id === columnId);
@@ -1138,6 +1068,9 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
         id: newColName,
         accessorKey: newColName,
         header: newColName,
+        size: 150,
+        minSize: 60,
+        maxSize: 800,
       };
       setColumns(prev => [...prev, newColumn]);
       const offset = currentPage * pageSize;
@@ -1292,25 +1225,32 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
         ) : (
           <div className="p-3 sm:p-4 min-w-max">
             <div className="border rounded-lg overflow-hidden">
-              <table className="w-full border-collapse">
+              <table
+                className="border-collapse"
+                style={{
+                  tableLayout: 'fixed',
+                  width: table.getTotalSize(),
+                  minWidth: '100%',
+                }}
+              >
               <thead>
                 <tr className="border-b bg-muted/50">
-                  {table.getFlatHeaders().map((header) => {
-                    const headerAlign = getResolvedAlign(header.id);
-                    const headerAlignClass =
-                      headerAlign === "center" ? "text-center" : headerAlign === "right" ? "text-right" : "text-left";
-                    return (
+                  {table.getFlatHeaders().map((header) => (
                     <th
                       key={header.id}
-                      className={`${headerAlignClass} p-2 sm:p-3 font-semibold text-xs sm:text-sm text-foreground border-r last:border-r-0 whitespace-nowrap relative group`}
-                      style={{ width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize() }}
+                      className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm text-foreground border-r last:border-r-0 whitespace-nowrap relative group"
+                      style={{
+                        width: header.getSize(),
+                        minWidth: header.column.columnDef.minSize ?? 60,
+                        maxWidth: header.column.columnDef.maxSize ?? 800,
+                      }}
                     >
-                      <div className={`flex items-center gap-2 overflow-hidden ${headerAlign === "center" ? "justify-center" : headerAlign === "right" ? "justify-end" : "justify-between"}`}>
+                      <div className="flex items-center justify-between gap-2 pr-1">
                         <button
                           onClick={header.column.getToggleSortingHandler()}
-                          className="flex items-center gap-1 hover:text-primary transition-colors min-w-0 shrink"
+                          className="flex items-center gap-1 hover:text-primary transition-colors min-w-0 flex-1 text-left"
                         >
-                          <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                          <span className="truncate block">{flexRender(header.column.columnDef.header, header.getContext())}</span>
                           <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                         </button>
                         <DropdownMenu>
@@ -1448,17 +1388,21 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      {/* Resize handle - drag to change column width */}
                       <div
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
-                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none bg-transparent hover:bg-primary/30 active:bg-primary/50 ${header.column.getIsResizing() ? "bg-primary/50" : ""}`}
-                        style={{ userSelect: "none" }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          header.getResizeHandler()(e);
+                        }}
+                        onTouchStart={(e) => {
+                          header.getResizeHandler()(e);
+                        }}
+                        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none z-10 hover:bg-primary/40 active:bg-primary/60 shrink-0"
+                        style={{ userSelect: 'none', minWidth: 8 }}
                         title="Drag to resize column"
                       />
                     </th>
-                    );
-                  })}
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -1470,8 +1414,12 @@ export default function CSVPreview({ csvId, onPendingChangesChange, onRequestCon
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className="p-2 sm:p-3 text-xs sm:text-sm text-foreground border-r last:border-r-0 whitespace-nowrap overflow-hidden"
-                        style={{ width: cell.column.getSize(), minWidth: cell.column.getSize(), maxWidth: cell.column.getSize() }}
+                        className="p-2 sm:p-3 text-xs sm:text-sm text-foreground border-r last:border-r-0 whitespace-nowrap"
+                        style={{
+                          width: cell.column.getSize(),
+                          minWidth: cell.column.columnDef.minSize ?? 60,
+                          maxWidth: cell.column.columnDef.maxSize ?? 800,
+                        }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>

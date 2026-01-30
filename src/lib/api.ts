@@ -131,7 +131,7 @@ export const logout = (): void => {
 export interface DatasetResponse {
   id: number;
   name: string;
-  type: 'pdf' | 'csv' | 'database';
+  type: 'pdf' | 'csv';
   summary?: string;
   report?: string;
   questions?: string[];
@@ -145,7 +145,7 @@ export interface DatasetResponse {
 }
 
 // Dummy data generator
-const generateDummyResponse = (name: string, type: 'pdf' | 'csv' | 'database'): DatasetResponse => {
+const generateDummyResponse = (name: string, type: 'pdf' | 'csv'): DatasetResponse => {
   const baseResponse = {
     id: Math.floor(Math.random() * 10000),
     name,
@@ -189,21 +189,8 @@ const generateDummyResponse = (name: string, type: 'pdf' | 'csv' | 'database'): 
         date: new Date(2024, 0, i + 1).toLocaleDateString(),
       }))
     };
-  } else {
-    return {
-      ...baseResponse,
-      summary: `Database "${name}" connected successfully. The database contains multiple tables with relational data structure. Initial analysis shows well-organized schema with proper indexing.`,
-      report: `# Database Analysis Report\n\n## Database Overview\nDatabase: ${name}\nTables: 12\nTotal Records: 50,000+\n\n## Schema Analysis\n- Primary keys properly defined\n- Foreign key relationships established\n- Indexes optimized for queries\n\n## Performance Metrics\n- Query response time: <50ms\n- Connection pool: Healthy\n- Data integrity: Verified`,
-      questions: [
-        'How many tables are in this database?',
-        'What is the total number of records?',
-        'Can you show the schema relationships?',
-        'What are the most frequently queried tables?',
-        'Are there any performance bottlenecks?'
-      ],
-      size: '45 MB'
-    };
   }
+  return baseResponse as DatasetResponse;
 };
 
 // API endpoints (dummy implementations)
@@ -212,10 +199,16 @@ export const uploadPDF = async (formData: FormData): Promise<DatasetResponse> =>
   const response = await apiRequest<{
     id: string;
     name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
+    dataset_type: 'pdf' | 'csv';
     file_name: string;
     file_size: number;
     description?: string;
+    summary?: string;
+    report?: string;
+    questions?: string[];
+    summary_generated?: boolean;
+    questions_generated?: boolean;
+    report_generated?: boolean;
     uploaded_at: string;
     size: string;
   }>("/datasets/upload/pdf", {
@@ -237,7 +230,7 @@ export const uploadPDF = async (formData: FormData): Promise<DatasetResponse> =>
   return {
     id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    type: response.dataset_type as 'pdf' | 'csv',
     summary: response.summary,
     report: response.report,
     questions: response.questions,
@@ -254,7 +247,7 @@ export const uploadCSV = async (formData: FormData): Promise<DatasetResponse> =>
   const response = await apiRequest<{
     id: string;
     name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
+    dataset_type: 'pdf' | 'csv';
     file_name: string;
     file_size: number;
     description?: string;
@@ -279,7 +272,7 @@ export const uploadCSV = async (formData: FormData): Promise<DatasetResponse> =>
   return {
     id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    type: response.dataset_type as 'pdf' | 'csv',
     summary: `CSV dataset "${response.name}" uploaded successfully.`,
     report: `# CSV Analysis Report\n\n## Dataset Overview\nDataset: ${response.name}\nSize: ${response.size}\n\n## Status\nUploaded and ready for analysis.`,
     questions: [
@@ -293,57 +286,6 @@ export const uploadCSV = async (formData: FormData): Promise<DatasetResponse> =>
   };
 };
 
-export const uploadDatabase = async (formData: FormData): Promise<DatasetResponse> => {
-  const response = await apiRequest<{
-    id: string;
-    name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
-    file_name: string;
-    file_size: number;
-    description?: string;
-    uploaded_at: string;
-    size: string;
-  }>("/datasets/upload/database", {
-    method: "POST",
-    body: formData,
-    headers: {},
-  });
-
-  if (!response || !response.id) {
-    throw new Error("Invalid response from server");
-  }
-
-  return {
-    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
-    name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: `Database "${response.name}" connected successfully.`,
-    report: `# Database Report\n\n## Overview\nDatabase: ${response.name}\nSize: ${response.size}\n\n## Status\nConnected and ready for analysis.`,
-    questions: [],
-    uploadedAt: new Date(response.uploaded_at).toISOString(),
-    size: response.size,
-    _id: response.id,
-  };
-};
-
-export const connectDatabase = async (data: {
-  name: string;
-  file?: File;
-  useVCSAccess?: boolean;
-}): Promise<DatasetResponse> => {
-  // If file is provided, upload to backend
-  if (data.file) {
-    const formData = new FormData();
-    formData.append("name", data.name);
-    formData.append("file", data.file);
-    return uploadDatabase(formData);
-  }
-
-  // VCS / no file: use mock for now (no backend for VCS yet)
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  return generateDummyResponse(data.name, 'database');
-};
-
 export const getDatasets = async (): Promise<DatasetResponse[]> => {
   const response = await apiRequest<{ datasets: any[], total: number }>("/datasets/");
   
@@ -352,7 +294,7 @@ export const getDatasets = async (): Promise<DatasetResponse[]> => {
   return response.datasets.map((d, index) => ({
     id: index + 1, // Use index for display ID
     name: d.name,
-    type: d.dataset_type as 'pdf' | 'csv' | 'database',
+    type: d.dataset_type as 'pdf' | 'csv',
     summary: `${d.dataset_type.toUpperCase()} dataset "${d.name}"`,
     report: `# ${d.dataset_type.toUpperCase()} Analysis Report\n\nDataset: ${d.name}\nSize: ${d.size}`,
     questions: [],
@@ -367,7 +309,7 @@ export const getDatasetById = async (id: number | string): Promise<DatasetRespon
   const response = await apiRequest<{
     id: string;
     name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
+    dataset_type: 'pdf' | 'csv';
     file_name: string;
     file_size: number;
     description?: string;
@@ -385,7 +327,7 @@ export const getDatasetById = async (id: number | string): Promise<DatasetRespon
   return {
     id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    type: response.dataset_type as 'pdf' | 'csv',
     summary: response.summary,
     report: response.report,
     questions: response.questions,
@@ -471,7 +413,7 @@ export const generateSummary = async (datasetId: string | number): Promise<Datas
   const response = await apiRequest<{
     id: string;
     name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
+    dataset_type: 'pdf' | 'csv';
     file_name: string;
     file_size: number;
     description?: string;
@@ -490,7 +432,7 @@ export const generateSummary = async (datasetId: string | number): Promise<Datas
   return {
     id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    type: response.dataset_type as 'pdf' | 'csv',
     summary: response.summary,
     report: response.report,
     questions: response.questions,
@@ -507,7 +449,7 @@ export const generateQuestions = async (datasetId: string | number): Promise<Dat
   const response = await apiRequest<{
     id: string;
     name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
+    dataset_type: 'pdf' | 'csv';
     file_name: string;
     file_size: number;
     description?: string;
@@ -526,7 +468,7 @@ export const generateQuestions = async (datasetId: string | number): Promise<Dat
   return {
     id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    type: response.dataset_type as 'pdf' | 'csv',
     summary: response.summary,
     report: response.report,
     questions: response.questions,
@@ -543,7 +485,7 @@ export const generateReport = async (datasetId: string | number): Promise<Datase
   const response = await apiRequest<{
     id: string;
     name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
+    dataset_type: 'pdf' | 'csv';
     file_name: string;
     file_size: number;
     description?: string;
@@ -562,7 +504,7 @@ export const generateReport = async (datasetId: string | number): Promise<Datase
   return {
     id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
     name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
+    type: response.dataset_type as 'pdf' | 'csv',
     summary: response.summary,
     report: response.report,
     questions: response.questions,

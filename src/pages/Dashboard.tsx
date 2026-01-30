@@ -16,7 +16,7 @@ export default function Dashboard() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  const datasetType = (type as 'pdf' | 'csv' | 'database') || 'database';
+  const datasetType = (type === 'pdf' || type === 'csv' ? type : 'csv');
   // Keep ID as string since backend uses MongoDB ObjectId strings
   // Don't default to "1" - require a valid ID
   const datasetId = id;

@@ -3,18 +3,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FileText, BarChart3, Download, Database, Sheet, Send, Maximize2, Minimize2, Network, CheckCircle2, XCircle, Sparkles, Loader2 } from "lucide-react";
+import { FileText, BarChart3, Download, Sheet, Send, Maximize2, Minimize2, CheckCircle2, XCircle, Sparkles, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import PDFViewer from "./PDFViewer";
 import CSVPreview from "./CSVPreview";
-import DatabaseERDViewer from "./DatabaseERDViewer";
 import ReportDesignSelectionDialog from "./ReportDesignSelectionDialog";
 import ReportPreviewDialog from "./ReportPreviewDialog";
 import { getDatasetById, DatasetResponse, generateSummary, generateQuestions, generateReport } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 
 interface DataTabsProps {
-  datasetType: 'pdf' | 'csv' | 'database';
+  datasetType: 'pdf' | 'csv';
   datasetId: number | string;
   onSendQuestion?: (question: string) => void;
   isFullscreen?: boolean;
@@ -62,9 +61,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
     loadDataset();
   }, [datasetId, toast]);
 
-  const dataSummaryText = dataset?.summary || (datasetType === 'database' 
-    ? "Your database contains 12 tables with a total of 45,892 records. The data is well-structured and ready for analysis. Key tables include customer information, transaction history, and product catalog."
-    : datasetType === 'pdf'
+  const dataSummaryText = dataset?.summary || (datasetType === 'pdf'
     ? "This PDF document contains 24 pages with approximately 5.2 MB of content. The document includes text, tables, and some embedded images. The content has been extracted and is ready for AI-powered analysis."
     : "Your CSV file contains 1,245 rows and 8 columns. The data appears to be clean with minimal missing values. Column types include numeric values, categorical data, and timestamp information.");
 
@@ -166,16 +163,14 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center justify-between text-base sm:text-lg">
               <div className="flex items-center gap-2">
-                {datasetType === 'database' ? (
-                  <Database className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                ) : datasetType === 'pdf' ? (
+                {datasetType === 'pdf' ? (
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 ) : (
                   <Sheet className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 )}
                 Data Summary
               </div>
-              {((datasetType === 'pdf' || datasetType === 'csv') && (!dataset?.summary_generated || !dataset?.summary)) && (
+              {(!dataset?.summary_generated || !dataset?.summary) && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -205,7 +200,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
                   {dataset.summary}
                 </p>
               </ScrollArea>
-            ) : (datasetType === 'database' || !dataset) ? (
+            ) : !dataset ? (
               <ScrollArea className="h-[200px] pr-2 sm:pr-4">
                 <p className="text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                   {dataSummaryText}
@@ -223,7 +218,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center justify-between text-base sm:text-lg">
               <span>Suggested Questions</span>
-              {((datasetType === 'pdf' || datasetType === 'csv') && (!dataset?.questions_generated || !dataset?.questions || dataset.questions.length === 0)) && (
+              {(!dataset?.questions_generated || !dataset?.questions || dataset.questions.length === 0) && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -345,9 +340,6 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
           {datasetType === 'csv' && (
             <TabsTrigger value="csvPreview">CSV Preview</TabsTrigger>
           )}
-          {datasetType === 'database' && (
-            <TabsTrigger value="erdPreview">Preview Database</TabsTrigger>
-          )}
           <TabsTrigger value="report">Report</TabsTrigger>
           {datasetType !== 'pdf' && (
             <TabsTrigger value="graphs">Graphs</TabsTrigger>
@@ -403,37 +395,6 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
             </TabsContent>
           )}
 
-          {datasetType === 'database' && (
-            <TabsContent value="erdPreview" className="mt-0">
-              <Card className="h-[500px] flex items-center justify-center">
-                <CardContent className="flex flex-col items-center gap-6">
-                  <div className="text-center space-y-3">
-                    <div className="flex justify-center">
-                      <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Network className="h-8 w-8 text-primary" />
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold mb-2">Database Schema Visualization</h3>
-                      <p className="text-sm text-muted-foreground max-w-md">
-                        Explore your database structure with an interactive Entity Relationship Diagram. 
-                        Drag tables, zoom, and understand your data relationships visually.
-                      </p>
-                    </div>
-                  </div>
-                  <Button 
-                    size="lg" 
-                    onClick={() => setShowERD(true)}
-                    className="gap-2"
-                  >
-                    <Network className="h-5 w-5" />
-                    Open ERD Viewer
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
           <TabsContent value="report" className="mt-0">
             <Card>
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6">
@@ -442,7 +403,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
                   <CardDescription className="text-xs sm:text-sm">Detailed insights from your data analysis</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  {((datasetType === 'pdf' || datasetType === 'csv') && (!dataset?.report_generated || !dataset?.report)) && (
+                  {(!dataset?.report_generated || !dataset?.report) && (
                     <Button 
                       onClick={handleGenerateReport} 
                       variant="outline" 
@@ -492,7 +453,7 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
             </Card>
           </TabsContent>
 
-          {datasetType !== 'pdf' && (
+          {(datasetType === 'csv') && (
             <TabsContent value="graphs" className="mt-0">
               <Card>
                 <CardHeader>
@@ -516,14 +477,6 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
           )}
         </div>
       </div>
-      
-      {datasetType === 'database' && (
-        <DatabaseERDViewer 
-          open={showERD} 
-          onOpenChange={setShowERD}
-          datasetId={datasetId}
-        />
-      )}
       
       <ReportDesignSelectionDialog
         open={showDesignSelection}

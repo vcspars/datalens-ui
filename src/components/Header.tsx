@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Database, FileText, Sheet, Menu, ChevronDown, LayoutDashboard, HelpCircle, LogOut, Plus, FolderOpen, Sun, Moon, User } from "lucide-react";
+import { FileText, Sheet, Menu, ChevronDown, LayoutDashboard, HelpCircle, LogOut, Plus, FolderOpen, Sun, Moon, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,26 +17,23 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import UploadPDFDialog from "./UploadPDFDialog";
 import UploadCSVDialog from "./UploadCSVDialog";
-import ConnectDatabaseDialog from "./ConnectDatabaseDialog";
 import { getCurrentUser, logout, UserResponse } from "@/lib/api";
 
 interface Dataset {
   id: number;
   name: string;
-  type: 'pdf' | 'csv' | 'database';
+  type: 'pdf' | 'csv';
 }
 
 export default function Header() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [datasets] = useState<Dataset[]>([
-    { id: 1, name: "Sales Database", type: "database" },
-    { id: 2, name: "Financial Report Q4.pdf", type: "pdf" },
-    { id: 3, name: "Customer Data.csv", type: "csv" },
+    { id: 1, name: "Financial Report Q4.pdf", type: "pdf" },
+    { id: 2, name: "Customer Data.csv", type: "csv" },
   ]);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
-  const [dbDialogOpen, setDbDialogOpen] = useState(false);
   const [user, setUser] = useState<UserResponse | null>(null);
 
   useEffect(() => {
@@ -55,7 +52,6 @@ export default function Header() {
 
   const getDatasetIcon = (type: string) => {
     switch (type) {
-      case 'database': return <Database className="h-4 w-4" />;
       case 'pdf': return <FileText className="h-4 w-4" />;
       case 'csv': return <Sheet className="h-4 w-4" />;
       default: return null;
@@ -126,11 +122,6 @@ export default function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setDbDialogOpen(true)}>
-                <Database className="h-4 w-4 mr-2" />
-                Connect Database
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -205,7 +196,6 @@ export default function Header() {
 
       <UploadPDFDialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen} />
       <UploadCSVDialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen} />
-      <ConnectDatabaseDialog open={dbDialogOpen} onOpenChange={setDbDialogOpen} />
     </>
   );
 }

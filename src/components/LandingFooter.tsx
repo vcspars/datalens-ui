@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Database, Github, Twitter, Linkedin, Mail } from "lucide-react";
+import { Github, Twitter, Linkedin, Mail } from "lucide-react";
 
 export default function LandingFooter() {
   const currentYear = new Date().getFullYear();

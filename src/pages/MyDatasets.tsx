@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Sheet, Database, ChevronRight, Trash2, Plus } from "lucide-react";
+import { FileText, Sheet, ChevronRight, Trash2, Plus } from "lucide-react";
 import { getDatasets, deleteDataset, DatasetResponse } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import UploadPDFDialog from "@/components/UploadPDFDialog";
 import UploadCSVDialog from "@/components/UploadCSVDialog";
-import ConnectDatabaseDialog from "@/components/ConnectDatabaseDialog";
 
 interface DatasetItem {
   id: number;
@@ -24,11 +23,9 @@ export default function MyDatasets() {
 
   const [csvFiles, setCsvFiles] = useState<DatasetItem[]>([]);
   const [pdfFiles, setPdfFiles] = useState<DatasetItem[]>([]);
-  const [databases, setDatabases] = useState<DatasetItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
-  const [dbDialogOpen, setDbDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadDatasets = async () => {
@@ -38,7 +35,6 @@ export default function MyDatasets() {
 
       const csv: DatasetItem[] = [];
       const pdf: DatasetItem[] = [];
-      const db: DatasetItem[] = [];
 
       datasets.forEach((d: DatasetResponse) => {
         // Ensure _id is present - it should always be the MongoDB ObjectId from backend
@@ -59,14 +55,11 @@ export default function MyDatasets() {
           csv.push(item);
         } else if (d.type === "pdf") {
           pdf.push(item);
-        } else if (d.type === "database") {
-          db.push(item);
         }
       });
 
       setCsvFiles(csv);
       setPdfFiles(pdf);
-      setDatabases(db);
     } catch (error: any) {
       toast({
         title: "Failed to load datasets",
@@ -82,7 +75,7 @@ export default function MyDatasets() {
     loadDatasets();
   }, [toast]);
 
-  const handleDatasetClick = (type: 'csv' | 'pdf' | 'database', item: DatasetItem) => {
+  const handleDatasetClick = (type: 'csv' | 'pdf', item: DatasetItem) => {
     // Use MongoDB ObjectId (_id) - it should always be present
     if (!item._id) {
       toast({
@@ -95,7 +88,7 @@ export default function MyDatasets() {
     navigate(`/dashboard/${type}/${item._id}`);
   };
 
-  const handleDelete = async (e: React.MouseEvent, item: DatasetItem, type: 'csv' | 'pdf' | 'database') => {
+  const handleDelete = async (e: React.MouseEvent, item: DatasetItem, type: 'csv' | 'pdf') => {
     e.stopPropagation(); // Prevent navigation when clicking delete
     
     if (!item._id) {
@@ -140,7 +133,7 @@ export default function MyDatasets() {
 
   const renderDatasetList = (
     items: DatasetItem[],
-    type: 'csv' | 'pdf' | 'database',
+    type: 'csv' | 'pdf',
     Icon: typeof FileText
   ) => {
     if (isLoading) {
@@ -161,16 +154,14 @@ export default function MyDatasets() {
             onClick={() => {
               if (type === 'csv') {
                 setCsvDialogOpen(true);
-              } else if (type === 'pdf') {
+              } else {
                 setPdfDialogOpen(true);
-              } else if (type === 'database') {
-                setDbDialogOpen(true);
               }
             }}
             className="gap-2"
           >
             <Plus className="h-4 w-4" />
-            Add {type === 'csv' ? 'CSV File' : type === 'pdf' ? 'PDF File' : 'Database'}
+            Add {type === 'csv' ? 'CSV File' : 'PDF File'}
           </Button>
         </div>
       );
@@ -258,20 +249,6 @@ export default function MyDatasets() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-primary" />
-                Databases
-              </CardTitle>
-              <CardDescription>
-                Connected database sources
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {renderDatasetList(databases, 'database', Database)}
-            </CardContent>
-          </Card>
         </div>
       </div>
 
@@ -286,13 +263,6 @@ export default function MyDatasets() {
         open={csvDialogOpen} 
         onOpenChange={(open) => {
           setCsvDialogOpen(open);
-          if (!open) handleUploadSuccess();
-        }} 
-      />
-      <ConnectDatabaseDialog 
-        open={dbDialogOpen} 
-        onOpenChange={(open) => {
-          setDbDialogOpen(open);
           if (!open) handleUploadSuccess();
         }} 
       />
