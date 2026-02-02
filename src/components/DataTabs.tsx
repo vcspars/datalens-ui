@@ -488,8 +488,12 @@ export default function DataTabs({ datasetType, datasetId, onSendQuestion, isFul
         open={showReportPreview}
         onOpenChange={setShowReportPreview}
         designId={selectedDesign}
-        reportContent={reportText}
+        reportContent={reportText ?? ""}
         reportName="Analysis Report"
+        onBackToDesigns={() => {
+          setShowReportPreview(false);
+          setShowDesignSelection(true);
+        }}
       />
       
       {/* Tab Change Confirmation Dialog */}

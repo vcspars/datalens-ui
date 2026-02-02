@@ -10,6 +10,8 @@ interface ReportPreviewDialogProps {
   designId: string;
   reportContent: string;
   reportName?: string;
+  /** When "Back to Designs" is clicked, reopen design selection (optional) */
+  onBackToDesigns?: () => void;
 }
 
 const designStyles = {
@@ -44,12 +46,22 @@ export default function ReportPreviewDialog({
   onOpenChange, 
   designId, 
   reportContent,
-  reportName = "Analysis Report"
+  reportName = "Analysis Report",
+  onBackToDesigns
 }: ReportPreviewDialogProps) {
   const { toast } = useToast();
   const style = designStyles[designId as keyof typeof designStyles] || designStyles.professional;
+  const safeContent = reportContent ?? "";
 
   const handleDownload = () => {
+    if (!safeContent.trim()) {
+      toast({
+        title: "No report content",
+        description: "Generate a report first, then download.",
+        variant: "destructive",
+      });
+      return;
+    }
     // Create a styled HTML document
     const htmlContent = `
       <!DOCTYPE html>
@@ -95,7 +107,7 @@ export default function ReportPreviewDialog({
             <h1>${reportName}</h1>
             <p class="date">Generated: ${new Date().toLocaleDateString()}</p>
           </div>
-          <div class="content">${reportContent}</div>
+          <div class="content">${safeContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
         </body>
       </html>
     `;
@@ -243,7 +255,13 @@ export default function ReportPreviewDialog({
           {/* Footer Actions */}
           <DialogFooter className="border-t px-6 py-4 bg-background">
             <div className="flex items-center justify-between w-full">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onOpenChange(false);
+                  onBackToDesigns?.();
+                }}
+              >
                 Back to Designs
               </Button>
               <Button onClick={handleDownload} className="gap-2">
