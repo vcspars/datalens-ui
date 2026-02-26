@@ -2,52 +2,37 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
+// ---------------------------------------------------------------------------
 // Token management
-export const getAuthToken = (): string | null => {
-  return localStorage.getItem("auth_token");
-};
+// ---------------------------------------------------------------------------
+export const getAuthToken = (): string | null => localStorage.getItem("auth_token");
+export const setAuthToken = (token: string): void => localStorage.setItem("auth_token", token);
+export const removeAuthToken = (): void => localStorage.removeItem("auth_token");
 
-export const setAuthToken = (token: string): void => {
-  localStorage.setItem("auth_token", token);
-};
-
-export const removeAuthToken = (): void => {
-  localStorage.removeItem("auth_token");
-};
-
-// API request helper (exported for use in components)
+// ---------------------------------------------------------------------------
+// Generic request helper
+// ---------------------------------------------------------------------------
 export const apiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> => {
   const token = getAuthToken();
-  const headers: HeadersInit = {
-    ...options.headers,
-  };
+  const headers: HeadersInit = { ...options.headers };
 
-  // Only set Content-Type for JSON, not for FormData
   if (!(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
+    (headers as Record<string, string>)["Content-Type"] = "application/json";
   }
-
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  console.log(`[API] ${options.method || "GET"} ${endpoint}`);
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
 
   if (!response.ok) {
-    // Handle 401 Unauthorized - token might be expired
     if (response.status === 401) {
       removeAuthToken();
-      // Redirect to login or show error
-      if (typeof window !== 'undefined') {
-        // Don't redirect automatically - let the app handle it
-        // window.location.href = '/auth';
-      }
       throw new Error("Authentication failed. Please login again.");
     }
     let error: { detail?: string };
@@ -59,26 +44,22 @@ export const apiRequest = async <T>(
     throw new Error(error.detail || `HTTP error! status: ${response.status}`);
   }
 
-  // Handle 204 No Content responses (like DELETE) - no body
-  if (response.status === 204) {
-    return undefined as T;
-  }
+  if (response.status === 204) return undefined as T;
 
-  // Try to parse JSON, but handle empty responses
   const text = await response.text();
-  if (!text) {
-    return undefined as T;
-  }
+  if (!text) return undefined as T;
 
   try {
     return JSON.parse(text) as T;
   } catch (e) {
-    console.error("Failed to parse JSON response:", e, "Response text:", text);
+    console.error("[API] Failed to parse JSON response:", e);
     throw new Error("Invalid JSON response from server");
   }
 };
 
-// Authentication API
+// ---------------------------------------------------------------------------
+// Auth types & endpoints
+// ---------------------------------------------------------------------------
 export interface SignupRequest {
   email: string;
   password: string;
@@ -103,6 +84,7 @@ export interface UserResponse {
 }
 
 export const signup = async (data: SignupRequest): Promise<TokenResponse> => {
+  console.log("[API] signup:", data.email);
   const response = await apiRequest<TokenResponse>("/auth/signup", {
     method: "POST",
     body: JSON.stringify(data),
@@ -112,6 +94,7 @@ export const signup = async (data: SignupRequest): Promise<TokenResponse> => {
 };
 
 export const login = async (data: LoginRequest): Promise<TokenResponse> => {
+  console.log("[API] login:", data.email);
   const response = await apiRequest<TokenResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
@@ -120,18 +103,294 @@ export const login = async (data: LoginRequest): Promise<TokenResponse> => {
   return response;
 };
 
-export const getCurrentUser = async (): Promise<UserResponse> => {
-  return apiRequest<UserResponse>("/auth/me");
-};
+export const getCurrentUser = async (): Promise<UserResponse> =>
+  apiRequest<UserResponse>("/auth/me");
 
 export const logout = (): void => {
+  console.log("[API] logout");
   removeAuthToken();
 };
 
+// ---------------------------------------------------------------------------
+// Chat types & endpoints
+// ---------------------------------------------------------------------------
+export interface ChatMessageItem {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  has_table: boolean;
+  table_data: Record<string, string>[];
+  table_columns: string[];
+  tables?: { columns: string[]; data: Record<string, string>[] }[];
+  created_at: string;
+}
+
+export interface ChatHistoryResponse {
+  messages: ChatMessageItem[];
+  session_id: string;
+}
+
+export const getChatHistory = async (): Promise<ChatHistoryResponse> => {
+  console.log("[API] getChatHistory");
+  return apiRequest<ChatHistoryResponse>("/chat/history");
+};
+
+export const clearChatHistory = async (): Promise<void> => {
+  console.log("[API] clearChatHistory");
+  await apiRequest<void>("/chat/history", { method: "DELETE" });
+};
+
+// ---------------------------------------------------------------------------
+// Bookmarks — persisted per user in MongoDB chat_sessions
+// ---------------------------------------------------------------------------
+
+export interface BookmarkItem {
+  id: string;
+  question: string;
+  created_at: string;
+}
+
+export const getBookmarks = async (): Promise<BookmarkItem[]> => {
+  console.log("[API] getBookmarks");
+  const res = await apiRequest<{ bookmarks: BookmarkItem[] }>("/chat/bookmarks");
+  return res.bookmarks;
+};
+
+export const addBookmark = async (question: string): Promise<BookmarkItem> => {
+  console.log("[API] addBookmark:", question.slice(0, 60));
+  return apiRequest<BookmarkItem>("/chat/bookmarks", {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
+};
+
+export const deleteBookmark = async (bookmarkId: string): Promise<void> => {
+  console.log("[API] deleteBookmark:", bookmarkId);
+  await apiRequest<void>(`/chat/bookmarks/${bookmarkId}`, { method: "DELETE" });
+};
+
+// ---------------------------------------------------------------------------
+// DB Overview — persisted per user in MongoDB
+// ---------------------------------------------------------------------------
+
+export interface DbOverview {
+  summary: string;
+  questions: string[];
+  report: string;
+}
+
+export const getDbOverview = async (): Promise<DbOverview> => {
+  console.log("[API] getDbOverview");
+  return apiRequest<DbOverview>("/chat/db/overview");
+};
+
+export const clearDbOverview = async (): Promise<void> => {
+  console.log("[API] clearDbOverview");
+  await apiRequest<void>("/chat/db/overview", { method: "DELETE" });
+};
+
+export const streamDbReport = async (): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
+  const token = getAuthToken();
+  console.log("[API] streamDbReport");
+  const response = await fetch(`${API_BASE_URL}/chat/db/report`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  if (!response.body) throw new Error("No response body");
+  return response.body.getReader();
+};
+
+export const streamDbSummary = async (): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
+  const token = getAuthToken();
+  console.log("[API] streamDbSummary");
+  const response = await fetch(`${API_BASE_URL}/chat/db/summary`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  if (!response.body) throw new Error("No response body");
+  return response.body.getReader();
+};
+
+export const streamDbQuestions = async (): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
+  const token = getAuthToken();
+  console.log("[API] streamDbQuestions");
+  const response = await fetch(`${API_BASE_URL}/chat/db/questions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  if (!response.body) throw new Error("No response body");
+  return response.body.getReader();
+};
+
+/**
+ * Open an SSE stream for chat with database.
+ * Returns a ReadableStreamDefaultReader to consume events.
+ */
+export const streamChat = async (
+  question: string
+): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
+  const token = getAuthToken();
+  console.log("[API] streamChat question:", question.slice(0, 80));
+
+  const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ question }),
+  });
+
+  if (!response.ok) {
+    let msg = response.statusText;
+    try {
+      const err = await response.json();
+      msg = err.detail || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  if (!response.body) throw new Error("No response body");
+  console.log("[API] streamChat SSE stream opened");
+  return response.body.getReader();
+};
+
+// ---------------------------------------------------------------------------
+// Dashboard item types & endpoints
+// ---------------------------------------------------------------------------
+export interface DashboardItemOut {
+  id: string;
+  item_type: "table" | "graph" | "report";
+  name: string;
+  table_data: Record<string, string>[];
+  table_columns: string[];
+  graph_type?: string;
+  graph_config?: Record<string, unknown>;
+  report_content?: string;
+  report_template?: string;
+  source_question?: string;
+  created_at: string;
+}
+
+export const getDashboardItems = async (): Promise<DashboardItemOut[]> => {
+  console.log("[API] getDashboardItems");
+  const response = await apiRequest<{ items: DashboardItemOut[]; total: number }>("/dashboard/items");
+  return response.items;
+};
+
+export const saveDashboardTable = async (payload: {
+  name: string;
+  table_data: Record<string, string>[];
+  table_columns: string[];
+  source_question?: string;
+}): Promise<{ id: string; message: string }> => {
+  console.log("[API] saveDashboardTable:", payload.name);
+  return apiRequest<{ id: string; message: string }>("/dashboard/items/table", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const saveDashboardGraph = async (payload: {
+  name: string;
+  graph_type: string;
+  graph_config: Record<string, unknown>;
+  table_data?: Record<string, string>[];
+  table_columns?: string[];
+  source_question?: string;
+}): Promise<{ id: string; message: string }> => {
+  console.log("[API] saveDashboardGraph:", payload.name, payload.graph_type);
+  return apiRequest<{ id: string; message: string }>("/dashboard/items/graph", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const deleteDashboardItem = async (id: string): Promise<void> => {
+  console.log("[API] deleteDashboardItem:", id);
+  await apiRequest<void>(`/dashboard/items/${id}`, { method: "DELETE" });
+};
+
+// ---------------------------------------------------------------------------
+// Dashboard reports
+// ---------------------------------------------------------------------------
+export const getDashboardReports = async (): Promise<DashboardItemOut[]> => {
+  console.log("[API] getDashboardReports");
+  const response = await apiRequest<{ reports: DashboardItemOut[]; total: number }>("/dashboard/reports");
+  return response.reports;
+};
+
+export const deleteDashboardReport = async (id: string): Promise<void> => {
+  console.log("[API] deleteDashboardReport:", id);
+  await apiRequest<void>(`/dashboard/reports/${id}`, { method: "DELETE" });
+};
+
+export const saveDashboardReport = async (payload: {
+  name: string;
+  content: string;
+  template: string;
+}): Promise<{ id: string; message: string }> => {
+  console.log("[API] saveDashboardReport:", payload.name);
+  return apiRequest<{ id: string; message: string }>("/dashboard/reports/save", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+/**
+ * Open an SSE stream for report generation.
+ */
+export const streamGenerateReport = async (payload: {
+  name: string;
+  item_ids: string[];
+  template: string;
+  prompt: string;
+}): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
+  const token = getAuthToken();
+  console.log("[API] streamGenerateReport:", payload.name);
+
+  const response = await fetch(`${API_BASE_URL}/dashboard/reports/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let msg = response.statusText;
+    try {
+      const err = await response.json();
+      msg = err.detail || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  if (!response.body) throw new Error("No response body");
+  console.log("[API] streamGenerateReport SSE stream opened");
+  return response.body.getReader();
+};
+
+// ---------------------------------------------------------------------------
+// Legacy dataset helpers kept for backward compat (upload routes, etc.)
+// ---------------------------------------------------------------------------
 export interface DatasetResponse {
   id: number;
   name: string;
-  type: 'pdf' | 'csv' | 'database';
+  type: "pdf" | "csv" | "database";
   summary?: string;
   report?: string;
   questions?: string[];
@@ -140,377 +399,22 @@ export interface DatasetResponse {
   report_generated?: boolean;
   uploadedAt: string;
   size?: string;
-  previewData?: any;
-  _id?: string; // MongoDB ObjectId for API calls
+  previewData?: unknown;
+  _id?: string;
 }
 
-// Dummy data generator
-const generateDummyResponse = (name: string, type: 'pdf' | 'csv' | 'database'): DatasetResponse => {
-  const baseResponse = {
-    id: Math.floor(Math.random() * 10000),
-    name,
-    type,
-    uploadedAt: new Date().toISOString(),
-  };
-
-  if (type === 'pdf') {
-    return {
-      ...baseResponse,
-      summary: `This PDF document "${name}" contains comprehensive information about various topics. The document spans multiple pages and includes detailed analysis, charts, and references.`,
-      report: `# PDF Analysis Report\n\n## Document Overview\nDocument: ${name}\nPages: 15\nSize: 2.5 MB\n\n## Key Findings\n- Important data points identified\n- Multiple sections analyzed\n- References to external sources\n\n## Recommendations\n- Further review recommended\n- Cross-reference with additional documents`,
-      questions: [
-        'What are the main topics covered in this document?',
-        'Can you summarize the key findings?',
-        'What are the recommendations mentioned?',
-        'Are there any data points that stand out?',
-        'What is the conclusion of this document?'
-      ],
-      size: '2.5 MB'
-    };
-  } else if (type === 'csv') {
-    return {
-      ...baseResponse,
-      summary: `This dataset "${name}" contains structured data with multiple columns and rows. The data includes numerical values, categorical information, and timestamps suitable for analysis.`,
-      report: `# CSV Analysis Report\n\n## Dataset Overview\nDataset: ${name}\nRows: 500\nColumns: 8\n\n## Statistical Summary\n- Average values calculated\n- Data distribution analyzed\n- Missing values: 2%\n\n## Insights\n- Strong correlation between variables\n- Seasonal patterns identified\n- Outliers detected and flagged`,
-      questions: [
-        'What is the average value of the numeric columns?',
-        'Are there any missing values in the dataset?',
-        'Can you identify any patterns or trends?',
-        'What are the most significant correlations?',
-        'Are there any outliers in the data?'
-      ],
-      size: '1.2 MB',
-      previewData: Array.from({ length: 50 }, (_, i) => ({
-        id: i + 1,
-        name: `Item ${i + 1}`,
-        category: ['Electronics', 'Clothing', 'Food', 'Books'][i % 4],
-        price: (Math.random() * 1000).toFixed(2),
-        quantity: Math.floor(Math.random() * 100),
-        date: new Date(2024, 0, i + 1).toLocaleDateString(),
-      }))
-    };
-  } else {
-    return {
-      ...baseResponse,
-      summary: `Database "${name}" connected successfully. The database contains multiple tables with relational data structure. Initial analysis shows well-organized schema with proper indexing.`,
-      report: `# Database Analysis Report\n\n## Database Overview\nDatabase: ${name}\nTables: 12\nTotal Records: 50,000+\n\n## Schema Analysis\n- Primary keys properly defined\n- Foreign key relationships established\n- Indexes optimized for queries\n\n## Performance Metrics\n- Query response time: <50ms\n- Connection pool: Healthy\n- Data integrity: Verified`,
-      questions: [
-        'How many tables are in this database?',
-        'What is the total number of records?',
-        'Can you show the schema relationships?',
-        'What are the most frequently queried tables?',
-        'Are there any performance bottlenecks?'
-      ],
-      size: '45 MB'
-    };
-  }
-};
-
-// API endpoints (dummy implementations)
-
-export const uploadPDF = async (formData: FormData): Promise<DatasetResponse> => {
-  const response = await apiRequest<{
-    id: string;
-    name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
-    file_name: string;
-    file_size: number;
-    description?: string;
-    uploaded_at: string;
-    size: string;
-  }>("/datasets/upload/pdf", {
-    method: "POST",
-    body: formData,
-    headers: {}, // Let browser set Content-Type with boundary for FormData
-  });
-  
-  if (!response) {
-    throw new Error("No response received from server");
-  }
-  
-  if (!response.id) {
-    console.error("Invalid response structure:", response);
-    throw new Error("Invalid response: missing 'id' field");
-  }
-  
-  // Convert to expected format
-  return {
-    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
-    name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: response.summary,
-    report: response.report,
-    questions: response.questions,
-    summary_generated: response.summary_generated || false,
-    questions_generated: response.questions_generated || false,
-    report_generated: response.report_generated || false,
-    uploadedAt: new Date(response.uploaded_at).toISOString(),
-    size: response.size,
-    _id: response.id, // Store MongoDB ObjectId for navigation
-  };
-};
-
-export const uploadCSV = async (formData: FormData): Promise<DatasetResponse> => {
-  const response = await apiRequest<{
-    id: string;
-    name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
-    file_name: string;
-    file_size: number;
-    description?: string;
-    uploaded_at: string;
-    size: string;
-  }>("/datasets/upload/csv", {
-    method: "POST",
-    body: formData,
-    headers: {}, // Let browser set Content-Type with boundary for FormData
-  });
-  
-  if (!response) {
-    throw new Error("No response received from server");
-  }
-  
-  if (!response.id) {
-    console.error("Invalid response structure:", response);
-    throw new Error("Invalid response: missing 'id' field");
-  }
-  
-  // Convert to expected format
-  return {
-    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
-    name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: `CSV dataset "${response.name}" uploaded successfully.`,
-    report: `# CSV Analysis Report\n\n## Dataset Overview\nDataset: ${response.name}\nSize: ${response.size}\n\n## Status\nUploaded and ready for analysis.`,
-    questions: [
-      'What is the structure of this dataset?',
-      'Are there any missing values?',
-      'Can you identify any patterns or trends?',
-    ],
-    uploadedAt: new Date(response.uploaded_at).toISOString(),
-    size: response.size,
-    _id: response.id, // Store MongoDB ObjectId for navigation
-  };
-};
-
-export const connectDatabase = async (data: {
-  name: string;
-  file?: File;
-  useVCSAccess?: boolean;
-}): Promise<DatasetResponse> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // TODO: Replace with actual API call
-  // const response = await fetch('/api/connect-database', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  //   headers: { 'Content-Type': 'application/json' }
-  // });
-  // return await response.json();
-  
-  return generateDummyResponse(data.name, 'database');
-};
-
 export const getDatasets = async (): Promise<DatasetResponse[]> => {
-  const response = await apiRequest<{ datasets: any[], total: number }>("/datasets/");
-  
-  // Convert to expected format
-  // MongoDB ObjectIds are strings, so we use them directly
-  return response.datasets.map((d, index) => ({
-    id: index + 1, // Use index for display ID
-    name: d.name,
-    type: d.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: `${d.dataset_type.toUpperCase()} dataset "${d.name}"`,
-    report: `# ${d.dataset_type.toUpperCase()} Analysis Report\n\nDataset: ${d.name}\nSize: ${d.size}`,
-    questions: [],
-    uploadedAt: new Date(d.uploaded_at).toISOString(),
-    size: d.size,
-    // Store the actual MongoDB ObjectId string for API calls
-    _id: d.id,
+  const response = await apiRequest<{ datasets: unknown[]; total: number }>("/datasets/");
+  return (response.datasets as Record<string, unknown>[]).map((d, index) => ({
+    id: index + 1,
+    name: d.name as string,
+    type: (d.dataset_type as "pdf" | "csv" | "database") || "csv",
+    uploadedAt: new Date((d.uploaded_at as string) || Date.now()).toISOString(),
+    size: d.size as string,
+    _id: d.id as string,
   }));
 };
 
-export const getDatasetById = async (id: number | string): Promise<DatasetResponse> => {
-  const response = await apiRequest<{
-    id: string;
-    name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
-    file_name: string;
-    file_size: number;
-    description?: string;
-    summary?: string;
-    questions?: string[];
-    report?: string;
-    summary_generated?: boolean;
-    questions_generated?: boolean;
-    report_generated?: boolean;
-    uploaded_at: string;
-    size: string;
-  }>(`/datasets/${id}`);
-  
-  // Convert to expected format
-  return {
-    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
-    name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: response.summary,
-    report: response.report,
-    questions: response.questions,
-    summary_generated: response.summary_generated || false,
-    questions_generated: response.questions_generated || false,
-    report_generated: response.report_generated || false,
-    uploadedAt: new Date(response.uploaded_at).toISOString(),
-    size: response.size,
-    _id: response.id,
-  };
-};
-
 export const deleteDataset = async (id: string): Promise<void> => {
-  await apiRequest<void>(`/datasets/${id}`, {
-    method: "DELETE",
-  });
-};
-
-export interface SaveChangesRequest {
-  columns: string[];
-  data: any[];
-}
-
-export interface SaveChangesResponse {
-  message: string;
-  rows_saved: number;
-  columns_saved: number;
-}
-
-export const saveDatasetChanges = async (
-  datasetId: string,
-  columns: string[],
-  data: any[]
-): Promise<SaveChangesResponse> => {
-  return await apiRequest<SaveChangesResponse>(`/datasets/${datasetId}/save-changes`, {
-    method: "POST",
-    body: JSON.stringify({
-      columns,
-      data,
-    }),
-  });
-};
-
-// Check if VCS special access is enabled
-export const hasVCSAccess = (): boolean => {
-  // Check environment variable or config
-  // For now, return true for demonstration
-  // TODO: Replace with actual check
-  //   return import.meta.env.VITE_VCS_USER === 'true';
-  return true; // Set to false to hide VCS access
-};
-
-// Generate content endpoints
-export const generateSummary = async (datasetId: string | number): Promise<DatasetResponse> => {
-  const response = await apiRequest<{
-    id: string;
-    name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
-    file_name: string;
-    file_size: number;
-    description?: string;
-    summary?: string;
-    questions?: string[];
-    report?: string;
-    summary_generated: boolean;
-    questions_generated: boolean;
-    report_generated: boolean;
-    uploaded_at: string;
-    size: string;
-  }>(`/datasets/${datasetId}/generate/summary`, {
-    method: "POST",
-  });
-  
-  return {
-    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
-    name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: response.summary,
-    report: response.report,
-    questions: response.questions,
-    summary_generated: response.summary_generated,
-    questions_generated: response.questions_generated,
-    report_generated: response.report_generated,
-    uploadedAt: new Date(response.uploaded_at).toISOString(),
-    size: response.size,
-    _id: response.id,
-  };
-};
-
-export const generateQuestions = async (datasetId: string | number): Promise<DatasetResponse> => {
-  const response = await apiRequest<{
-    id: string;
-    name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
-    file_name: string;
-    file_size: number;
-    description?: string;
-    summary?: string;
-    questions?: string[];
-    report?: string;
-    summary_generated: boolean;
-    questions_generated: boolean;
-    report_generated: boolean;
-    uploaded_at: string;
-    size: string;
-  }>(`/datasets/${datasetId}/generate/questions`, {
-    method: "POST",
-  });
-  
-  return {
-    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
-    name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: response.summary,
-    report: response.report,
-    questions: response.questions,
-    summary_generated: response.summary_generated,
-    questions_generated: response.questions_generated,
-    report_generated: response.report_generated,
-    uploadedAt: new Date(response.uploaded_at).toISOString(),
-    size: response.size,
-    _id: response.id,
-  };
-};
-
-export const generateReport = async (datasetId: string | number): Promise<DatasetResponse> => {
-  const response = await apiRequest<{
-    id: string;
-    name: string;
-    dataset_type: 'pdf' | 'csv' | 'database';
-    file_name: string;
-    file_size: number;
-    description?: string;
-    summary?: string;
-    questions?: string[];
-    report?: string;
-    summary_generated: boolean;
-    questions_generated: boolean;
-    report_generated: boolean;
-    uploaded_at: string;
-    size: string;
-  }>(`/datasets/${datasetId}/generate/report`, {
-    method: "POST",
-  });
-  
-  return {
-    id: parseInt(response.id.replace(/[^0-9]/g, '').slice(-8)) || Math.floor(Math.random() * 10000),
-    name: response.name,
-    type: response.dataset_type as 'pdf' | 'csv' | 'database',
-    summary: response.summary,
-    report: response.report,
-    questions: response.questions,
-    summary_generated: response.summary_generated,
-    questions_generated: response.questions_generated,
-    report_generated: response.report_generated,
-    uploadedAt: new Date(response.uploaded_at).toISOString(),
-    size: response.size,
-    _id: response.id,
-  };
+  await apiRequest<void>(`/datasets/${id}`, { method: "DELETE" });
 };

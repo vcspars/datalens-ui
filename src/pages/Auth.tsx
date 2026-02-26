@@ -23,7 +23,8 @@ export default function Auth() {
     try {
       await login({ email, password });
       toast.success("Logged in successfully!");
-      navigate('/my-datasets');
+      console.log("[Auth] Login successful, redirecting to /chat");
+      navigate('/chat');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Login failed. Please try again.");
     } finally {
@@ -51,7 +52,8 @@ export default function Auth() {
     try {
       await signup({ email, password, full_name, confirm_password });
       toast.success("Account created successfully!");
-      navigate('/my-datasets');
+      console.log("[Auth] Signup successful, redirecting to /chat");
+      navigate('/chat');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Signup failed. Please try again.");
     } finally {

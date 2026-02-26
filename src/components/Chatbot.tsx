@@ -33,7 +33,7 @@ export default function Chatbot({ datasetId, datasetType, externalQuestion, onQu
       database: "• Query your database with natural language\n• Explore relationships between tables\n• Generate complex data analysis reports"
     };
     
-    return `Welcome to DataLens! I can help you with:\n\n${messages[datasetType || 'csv']}`;
+    return `Welcome to SPARSLens! I can help you with:\n\n${messages[datasetType || 'csv']}`;
   };
   
   const [messages, setMessages] = useState<Message[]>([
