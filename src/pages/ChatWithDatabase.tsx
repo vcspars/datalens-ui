@@ -284,15 +284,17 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const [isRecording, setIsRecording] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [bookmarkRefreshTrigger, setBookmarkRefreshTrigger] = useState(0);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const lastUserPromptRef = useRef<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll
+  // Auto-scroll to the latest message (anchor at the start of the last message)
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [messages]);
+  }, [messages, historyLoading]);
 
   // Load history on mount
   useEffect(() => {
@@ -301,15 +303,21 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
       try {
         const data = await getChatHistory();
         console.log(`[ChatPanel] Loaded ${data.messages.length} history messages`);
+        const welcome: Message = {
+          id: "welcome",
+          role: "assistant",
+          content:
+            "Welcome to DataLens! I can help you with:\n\n" +
+            "- Query your database with natural language\n" +
+            "- Explore relationships between tables\n" +
+            "- Generate complex data analysis reports",
+          timestamp: new Date(),
+        };
+
         if (data.messages.length === 0) {
-          setMessages([{
-            id: "welcome",
-            role: "assistant",
-            content: "Welcome to DataLens! I can help you with:\n\n• Query your database with natural language\n• Explore relationships between tables\n• Generate complex data analysis reports",
-            timestamp: new Date(),
-          }]);
+          setMessages([welcome]);
         } else {
-          setMessages(data.messages.map((m: ChatMessageItem) => ({
+          const historyMessages: Message[] = data.messages.map((m: ChatMessageItem) => ({
             id: m.id,
             role: m.role as "user" | "assistant",
             content: m.content,
@@ -318,14 +326,19 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             table_data: m.table_data as Record<string, string>[],
             table_columns: m.table_columns,
             tables: m.tables as TableEntry[] | undefined,
-          })));
+          }));
+          setMessages([welcome, ...historyMessages]);
         }
       } catch (err) {
         console.error("[ChatPanel] Failed to load history:", err);
         setMessages([{
           id: "welcome",
           role: "assistant",
-          content: "Welcome to DataLens! I can help you with:\n\n• Query your database with natural language\n• Explore relationships between tables\n• Generate complex data analysis reports",
+          content:
+            "Welcome to DataLens! I can help you with:\n\n" +
+            "- Query your database with natural language\n" +
+            "- Explore relationships between tables\n" +
+            "- Generate complex data analysis reports",
           timestamp: new Date(),
         }]);
       } finally {
@@ -463,8 +476,24 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     setInput(question);
   };
 
-  const handleOpenConvertDialog = (msg: Message) => {
-    // Prefer the nearest preceding user message as the prompt for this reply
+  const handleCopyMessage = (message: Message) => {
+    if (!message.content) return;
+    navigator.clipboard
+      .writeText(message.content)
+      .then(() => {
+        setCopiedMessageId(message.id);
+        setTimeout(() => {
+          setCopiedMessageId((prev) => (prev === message.id ? null : prev));
+        }, 2000);
+      })
+      .catch((err) => {
+        console.error("[ChatPanel] Copy error:", err);
+        toast({ title: "Copy failed", description: String(err), variant: "destructive" });
+      });
+  };
+
+  // Derive the most relevant prompt for a given assistant message
+  const getPromptForMessage = (msg: Message): string => {
     let prompt = lastUserPromptRef.current;
     const idx = messages.findIndex((m) => m.id === msg.id);
     if (idx > 0) {
@@ -475,11 +504,22 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         }
       }
     }
+    return prompt;
+  };
+
+  const handleOpenConvertDialog = (msg: Message) => {
+    const prompt = getPromptForMessage(msg);
     onOpenConvertDialog(msg, prompt);
   };
 
-  const handleSaveToDashboardFromChat = async (msg: Message, name: string, tableIndexOrAll: number | "all" | undefined) => {
-    await onSaveToDashboard(msg, name, tableIndexOrAll, lastUserPromptRef.current);
+  const handleSaveToDashboardFromChat = async (
+    msg: Message,
+    name: string,
+    tableIndexOrAll: number | "all" | undefined,
+    sourcePromptFromActions?: string,
+  ) => {
+    const promptToUse = sourcePromptFromActions ?? getPromptForMessage(msg);
+    await onSaveToDashboard(msg, name, tableIndexOrAll, promptToUse);
   };
 
   // -------------------------------------------------------------------------
@@ -513,7 +553,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            messages.map((message) => (
+            messages.map((message, idx) => (
               <div
                 key={message.id}
                 className={`group flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
@@ -571,14 +611,34 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
-                      {/* Table actions rendered OUTSIDE the bubble */}
-                      {!message.isStreaming && message.has_table && (
-                        <TableActions
-                          message={message}
-                          sourcePrompt={lastUserPromptRef.current}
-                          onOpenConvertDialog={handleOpenConvertDialog}
-                          onSaveToDashboard={handleSaveToDashboardFromChat}
-                        />
+                      {/* Actions rendered OUTSIDE the bubble */}
+                      {!message.isStreaming && (
+                        <>
+                          {message.has_table ? (
+                            <TableActions
+                              message={message}
+                              sourcePrompt={getPromptForMessage(message)}
+                              onOpenConvertDialog={handleOpenConvertDialog}
+                              onSaveToDashboard={handleSaveToDashboardFromChat}
+                            />
+                          ) : message.role === "assistant" && message.content && message.id !== "welcome" ? (
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap pl-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5"
+                                onClick={() => handleCopyMessage(message)}
+                              >
+                                {copiedMessageId === message.id ? (
+                                  <Check className="h-3 w-3 text-green-500" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                                {copiedMessageId === message.id ? "Copied" : "Copy"}
+                              </Button>
+                            </div>
+                          ) : null}
+                        </>
                       )}
                     </div>
                   </div>
@@ -586,6 +646,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
               </div>
             ))
           )}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
