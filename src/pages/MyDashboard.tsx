@@ -5,12 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import GenerateReportDialog from "@/components/GenerateReportDialog";
+import { renderChart, CHART_COLORS, type GraphType } from "@/lib/chartUtils";
 import {
-  BarChart3, Table2, FileText, Trash2, Eye, Download, Loader2, RefreshCw,
+  BarChart3, Table2, FileText, Trash2, Eye, Download, Loader2, RefreshCw, Info, Maximize2,
 } from "lucide-react";
+import { ResponsiveContainer } from "recharts";
 import {
   getDashboardItems,
   getDashboardReports,
@@ -62,9 +70,9 @@ function ViewReportModal({
             {report.name}
           </DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 border rounded-lg p-4 bg-muted/20 max-h-[60vh]">
+        <div className="flex-1 border rounded-lg p-4 bg-muted/20 max-h-[60vh] overflow-auto">
           <MarkdownMessage content={report.report_content || "No content available."} />
-        </ScrollArea>
+        </div>
         <DialogFooter className="gap-2 flex-shrink-0">
           <Button variant="outline" onClick={handleDownload} className="gap-2">
             <Download className="h-4 w-4" />
@@ -86,6 +94,12 @@ export default function MyDashboard() {
   const [reports, setReports] = useState<DashboardItemOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewReport, setViewReport] = useState<DashboardItemOut | null>(null);
+  const [metaItem, setMetaItem] = useState<DashboardItemOut | null>(null);
+  const [previewItem, setPreviewItem] = useState<DashboardItemOut | null>(null);
+
+  const [itemTypeFilter, setItemTypeFilter] = useState<"all" | "table" | "graph">("all");
+  const [graphTypeFilter, setGraphTypeFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "24h" | "7d" | "30d">("all");
 
   const loadData = async () => {
     console.log("[MyDashboard] Loading dashboard data...");
@@ -185,6 +199,33 @@ export default function MyDashboard() {
     type: item.item_type as "graph" | "table",
   }));
 
+  // Filtered items for Saved Items grid
+  const filteredItems = items.filter((item) => {
+    if (itemTypeFilter !== "all" && item.item_type !== itemTypeFilter) {
+      return false;
+    }
+    if (itemTypeFilter === "graph" && graphTypeFilter !== "all") {
+      if (!item.graph_type || item.graph_type !== graphTypeFilter) return false;
+    }
+    if (dateFilter !== "all") {
+      const created = new Date(item.created_at);
+      if (!Number.isFinite(created.getTime())) return false;
+      const now = Date.now();
+      const diff = now - created.getTime();
+      const dayMs = 24 * 60 * 60 * 1000;
+      if (dateFilter === "24h" && diff > dayMs) return false;
+      if (dateFilter === "7d" && diff > 7 * dayMs) return false;
+      if (dateFilter === "30d" && diff > 30 * dayMs) return false;
+    }
+    return true;
+  });
+
+  const hasPrompt =
+    !!(metaItem?.source_prompt && metaItem.source_prompt.trim().length > 0);
+
+  const hasResponse =
+    !!(metaItem?.source_response && metaItem.source_response.trim().length > 0);
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -208,24 +249,66 @@ export default function MyDashboard() {
         </div>
 
         <Tabs defaultValue="items" className="w-full">
-          <TabsList>
-            <TabsTrigger value="items">
-              Saved Items
-              {items.length > 0 && (
-                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5">
-                  {items.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="reports">
-              My Reports
-              {reports.length > 0 && (
-                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5">
-                  {reports.length}
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between gap-3">
+            <TabsList>
+              <TabsTrigger value="items">
+                Saved Items
+                {items.length > 0 && (
+                  <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5">
+                    {items.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="reports">
+                My Reports
+                {reports.length > 0 && (
+                  <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5">
+                    {reports.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-2 text-xs">
+              <Select value={itemTypeFilter} onValueChange={(v) => setItemTypeFilter(v as "all" | "table" | "graph")}>
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All items</SelectItem>
+                  <SelectItem value="table">Tables</SelectItem>
+                  <SelectItem value="graph">Graphs</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={graphTypeFilter}
+                onValueChange={(v) => setGraphTypeFilter(v)}
+                disabled={itemTypeFilter !== "graph"}
+              >
+                <SelectTrigger className="h-8 w-[140px]">
+                  <SelectValue placeholder="Graph type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All graphs</SelectItem>
+                  <SelectItem value="bar">Bar</SelectItem>
+                  <SelectItem value="line">Line</SelectItem>
+                  <SelectItem value="pie">Pie</SelectItem>
+                  <SelectItem value="area">Area</SelectItem>
+                  <SelectItem value="scatter">Scatter</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as "all" | "24h" | "7d" | "30d")}>
+                <SelectTrigger className="h-8 w-[140px]">
+                  <SelectValue placeholder="Date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All time</SelectItem>
+                  <SelectItem value="24h">Last 24 hours</SelectItem>
+                  <SelectItem value="7d">Last 7 days</SelectItem>
+                  <SelectItem value="30d">Last 30 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {/* ---- Saved Items ---- */}
           <TabsContent value="items" className="mt-6">
@@ -233,7 +316,7 @@ export default function MyDashboard() {
               <div className="flex items-center justify-center h-48">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-3">
                 <BarChart3 className="h-12 w-12 opacity-30" />
                 <p className="text-sm font-medium">No saved items yet</p>
@@ -243,39 +326,101 @@ export default function MyDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {items.map((item) => (
-                  <Card key={item.id} className="group">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
+                {filteredItems.map((item) => (
+                  <Card key={item.id} className="group relative h-full flex flex-col">
                     <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        {item.item_type === "graph" ? (
-                          <BarChart3 className="h-4 w-4 text-primary flex-shrink-0" />
-                        ) : (
-                          <Table2 className="h-4 w-4 text-primary flex-shrink-0" />
-                        )}
-                        <span className="truncate">{item.name}</span>
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        {new Date(item.created_at).toLocaleDateString()} ·{" "}
-                        <span className="capitalize">{item.item_type}</span>
-                        {item.graph_type && ` · ${item.graph_type}`}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Visual placeholder — same style as the original UI */}
-                      <div className="aspect-video bg-muted rounded-lg flex items-center justify-center mb-3">
-                        {item.item_type === "graph" ? (
-                          <BarChart3 className="h-12 w-12 text-muted-foreground/40" />
-                        ) : (
-                          <Table2 className="h-12 w-12 text-muted-foreground/40" />
-                        )}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            {item.item_type === "graph" ? (
+                              <BarChart3 className="h-4 w-4 text-primary flex-shrink-0" />
+                            ) : (
+                              <Table2 className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                            <span className="truncate">{item.name}</span>
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            {new Date(item.created_at).toLocaleDateString()} ·{" "}
+                            <span className="capitalize">{item.item_type}</span>
+                            {item.graph_type && ` · ${item.graph_type}`}
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 rounded-full bg-background/80 backdrop-blur border border-border shadow-sm flex items-center justify-center"
+                            onClick={() => setMetaItem(item)}
+                            aria-label="Show source details"
+                          >
+                            <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 rounded-full bg-background/80 backdrop-blur border border-border shadow-sm flex items-center justify-center"
+                            onClick={() => setPreviewItem(item)}
+                            aria-label="Enlarge view"
+                          >
+                            <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        </div>
                       </div>
-                      {item.source_question && (
-                        <p className="text-[11px] text-muted-foreground italic truncate mb-2">
-                          "{item.source_question}"
-                        </p>
+                    </CardHeader>
+                    <CardContent className="pt-1 flex flex-col h-full">
+                      {/* Real preview: table or chart */}
+                      {item.item_type === "table" && item.table_columns?.length > 0 ? (
+                        <div className="h-72 border rounded-lg overflow-hidden mb-3 bg-muted mt-1">
+                          <div className="h-full w-full overflow-auto">
+                            <div className="inline-block min-w-full align-middle p-2">
+                            <table className="w-full text-xs border-collapse">
+                              <thead>
+                                <tr>
+                                  {item.table_columns.map((col) => (
+                                    <th key={col} className="text-left font-medium px-2 py-1.5 border border-border bg-muted/50 whitespace-nowrap">
+                                      {col}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(item.table_data || []).slice(0, 10).map((row, ri) => (
+                                  <tr key={ri}>
+                                    {item.table_columns!.map((col) => (
+                                      <td key={col} className="px-2 py-1.5 border border-border whitespace-nowrap" title={String(row[col] ?? "")}>
+                                        {String(row[col] ?? "")}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                            </div>
+                          </div>
+                      ) : item.item_type === "graph" && item.graph_config && item.graph_type ? (
+                        <div className="h-72 bg-muted rounded-lg overflow-hidden mb-3 mt-1">
+                          <ResponsiveContainer width="100%" height="100%">
+                            {renderChart(
+                              item.graph_type as GraphType,
+                              (item.graph_config.data as Record<string, unknown>[]) || [],
+                              (item.graph_config.xKey as string) || "",
+                              (item.graph_config.yKey as string) || "",
+                              (item.graph_config.colors as string[]) || CHART_COLORS
+                            ) as React.ReactElement}
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-72 flex items-center justify-center rounded-lg bg-muted/50 mb-3 mt-1">
+                          {item.item_type === "graph" ? (
+                            <BarChart3 className="h-12 w-12 text-muted-foreground/40" />
+                          ) : (
+                            <Table2 className="h-12 w-12 text-muted-foreground/40" />
+                          )}
+                        </div>
                       )}
-                      <div className="flex justify-end">
+                      <div className="flex justify-end mt-auto pt-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -371,6 +516,141 @@ export default function MyDashboard() {
 
       {/* View Report Modal */}
       <ViewReportModal report={viewReport} onClose={() => setViewReport(null)} />
+
+      {/* Large preview modal for saved items */}
+      <Dialog open={!!previewItem} onOpenChange={(v) => !v && setPreviewItem(null)}>
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewItem?.item_type === "graph" ? (
+                <BarChart3 className="h-4 w-4 text-primary" />
+              ) : (
+                <Table2 className="h-4 w-4 text-primary" />
+              )}
+              <span className="truncate">{previewItem?.name}</span>
+            </DialogTitle>
+            {previewItem && (
+              <p className="text-xs text-muted-foreground">
+                {new Date(previewItem.created_at).toLocaleString()} ·{" "}
+                <span className="capitalize">{previewItem.item_type}</span>
+                {previewItem.graph_type && ` · ${previewItem.graph_type}`}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="flex-1 mt-2">
+            {previewItem?.item_type === "table" && previewItem.table_columns?.length > 0 ? (
+              <div className="h-full border rounded-lg bg-muted overflow-auto">
+                <div className="inline-block min-w-full align-middle p-3">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr>
+                        {previewItem.table_columns.map((col) => (
+                          <th
+                            key={col}
+                            className="text-left font-medium px-2 py-2 border border-border bg-muted/50 whitespace-nowrap"
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(previewItem.table_data || []).map((row, ri) => (
+                        <tr key={ri}>
+                          {previewItem.table_columns!.map((col) => (
+                            <td
+                              key={col}
+                              className="px-2 py-1.5 border border-border whitespace-nowrap"
+                              title={String(row[col] ?? "")}
+                            >
+                              {String(row[col] ?? "")}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : previewItem?.item_type === "graph" && previewItem.graph_config && previewItem.graph_type ? (
+              <div className="h-[420px] border rounded-lg bg-muted overflow-hidden">
+                <ResponsiveContainer width="100%" height="100%">
+                  {renderChart(
+                    previewItem.graph_type as GraphType,
+                    (previewItem.graph_config.data as Record<string, unknown>[]) || [],
+                    (previewItem.graph_config.xKey as string) || "",
+                    (previewItem.graph_config.yKey as string) || "",
+                    (previewItem.graph_config.colors as string[]) || CHART_COLORS
+                  ) as React.ReactElement}
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-full border rounded-lg bg-muted/50 flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">No preview available for this item.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="mt-3">
+            <Button variant="outline" onClick={() => setPreviewItem(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Source details modal for saved items */}
+      <Dialog open={!!metaItem} onOpenChange={(v) => !v && setMetaItem(null)}>
+        <DialogContent className="max-w-xl w-[95vw] max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-primary" />
+              <span className="truncate">
+                {metaItem?.name}
+              </span>
+            </DialogTitle>
+            {metaItem && (
+              <p className="text-xs text-muted-foreground">
+                {new Date(metaItem.created_at).toLocaleString()} ·{" "}
+                <span className="capitalize">{metaItem.item_type}</span>
+                {metaItem.graph_type && ` · ${metaItem.graph_type}`}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="flex-1 border rounded-lg p-4 bg-muted/20 overflow-auto space-y-4 text-sm">
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                Prompt
+              </h3>
+              {hasPrompt ? (
+                <MarkdownMessage content={metaItem?.source_prompt || ""} />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Prompt not available for this item.
+                </p>
+              )}
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                AI response snippet
+              </h3>
+              {hasResponse ? (
+                <MarkdownMessage content={metaItem?.source_response || ""} />
+              ) : metaItem?.source_question && metaItem.source_question.trim().length > 0 ? (
+                <MarkdownMessage content={metaItem.source_question} />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No response snippet captured for this item.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="mt-3">
+            <Button variant="outline" onClick={() => setMetaItem(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

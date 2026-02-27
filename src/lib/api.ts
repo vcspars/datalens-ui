@@ -33,6 +33,10 @@ export const apiRequest = async <T>(
   if (!response.ok) {
     if (response.status === 401) {
       removeAuthToken();
+      // Redirect to external auth app when session is invalid/expired
+      if (typeof window !== "undefined") {
+        window.location.href = "http://localhost:8080/auth";
+      }
       throw new Error("Authentication failed. Please login again.");
     }
     let error: { detail?: string };
@@ -189,6 +193,34 @@ export const clearDbOverview = async (): Promise<void> => {
   await apiRequest<void>("/chat/db/overview", { method: "DELETE" });
 };
 
+// ---------------------------------------------------------------------------
+// DB Graphs tab — persisted per user in MongoDB chat_sessions
+// ---------------------------------------------------------------------------
+
+export interface DbGraphInstance {
+  id: string;
+  table_data: Record<string, string>[];
+  table_columns: string[];
+  graph_type: string;
+  xKey: string;
+  yKey: string;
+  source_label?: string;
+}
+
+export const getDbGraphs = async (): Promise<DbGraphInstance[]> => {
+  console.log("[API] getDbGraphs");
+  const res = await apiRequest<{ graphs: DbGraphInstance[] }>("/chat/db/graphs");
+  return res.graphs ?? [];
+};
+
+export const saveDbGraphs = async (graphs: DbGraphInstance[]): Promise<void> => {
+  console.log("[API] saveDbGraphs count=", graphs.length);
+  await apiRequest<{ message: string; count: number }>("/chat/db/graphs", {
+    method: "PUT",
+    body: JSON.stringify({ graphs }),
+  });
+};
+
 export const streamDbReport = async (): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
   const token = getAuthToken();
   console.log("[API] streamDbReport");
@@ -281,6 +313,8 @@ export interface DashboardItemOut {
   report_content?: string;
   report_template?: string;
   source_question?: string;
+  source_prompt?: string;
+  source_response?: string;
   created_at: string;
 }
 
@@ -295,6 +329,8 @@ export const saveDashboardTable = async (payload: {
   table_data: Record<string, string>[];
   table_columns: string[];
   source_question?: string;
+  source_prompt?: string;
+  source_response?: string;
 }): Promise<{ id: string; message: string }> => {
   console.log("[API] saveDashboardTable:", payload.name);
   return apiRequest<{ id: string; message: string }>("/dashboard/items/table", {
@@ -310,6 +346,8 @@ export const saveDashboardGraph = async (payload: {
   table_data?: Record<string, string>[];
   table_columns?: string[];
   source_question?: string;
+  source_prompt?: string;
+  source_response?: string;
 }): Promise<{ id: string; message: string }> => {
   console.log("[API] saveDashboardGraph:", payload.name, payload.graph_type);
   return apiRequest<{ id: string; message: string }>("/dashboard/items/graph", {

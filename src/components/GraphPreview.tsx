@@ -6,11 +6,7 @@
  * - Action buttons: Download (PNG/SVG/JPG), Convert (change graph type), Save to Dashboard
  */
 import { useState, useRef, useEffect } from "react";
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  AreaChart, Area, ScatterChart, Scatter,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
+import { ResponsiveContainer } from "recharts";
 import { toPng, toSvg, toJpeg } from "html-to-image";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -25,6 +21,14 @@ import { useToast } from "@/hooks/use-toast";
 import { saveDashboardGraph } from "@/lib/api";
 import SaveNameModal from "@/components/SaveNameModal";
 import {
+  detectColumnMeta,
+  getAvailableGraphTypes,
+  prepareChartData,
+  renderChart,
+  CHART_COLORS,
+  type GraphType,
+} from "@/lib/chartUtils";
+import {
   Download,
   BookmarkPlus,
   Loader2,
@@ -38,75 +42,6 @@ import {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type GraphType = "bar" | "line" | "pie" | "area" | "scatter";
-
-interface GraphPreviewProps {
-  tableData: Record<string, string>[];
-  tableColumns: string[];
-  sourceQuestion?: string;
-}
-
-interface ColumnMeta {
-  name: string;
-  isNumeric: boolean;
-  isCategorical: boolean;
-  uniqueCount: number;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-const CHART_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#f97316", "#84cc16", "#ec4899", "#14b8a6",
-];
-
-function detectColumnMeta(data: Record<string, string>[], columns: string[]): ColumnMeta[] {
-  return columns.map((col) => {
-    const values = data.map((r) => r[col]).filter((v) => v !== undefined && v !== "");
-    const numericCount = values.filter((v) => !isNaN(parseFloat(v))).length;
-    const uniqueValues = new Set(values);
-    return {
-      name: col,
-      isNumeric: numericCount / Math.max(values.length, 1) > 0.8,
-      isCategorical: uniqueValues.size < 30 && numericCount / Math.max(values.length, 1) < 0.5,
-      uniqueCount: uniqueValues.size,
-    };
-  });
-}
-
-function getAvailableGraphTypes(colMeta: ColumnMeta[]): GraphType[] {
-  const numericCols = colMeta.filter((c) => c.isNumeric);
-  const catCols = colMeta.filter((c) => c.isCategorical);
-  const types: GraphType[] = [];
-
-  if (numericCols.length >= 1 && catCols.length >= 1) {
-    types.push("bar", "line", "area");
-  }
-  if (numericCols.length >= 2) {
-    types.push("scatter");
-  }
-  if (numericCols.length >= 1 && catCols.length === 1 && catCols[0].uniqueCount <= 15) {
-    types.push("pie");
-  }
-  if (types.length === 0) {
-    types.push("bar"); // fallback
-  }
-  return [...new Set(types)];
-}
-
-function prepareChartData(
-  data: Record<string, string>[],
-  xKey: string,
-  yKey: string
-): Record<string, unknown>[] {
-  return data.slice(0, 100).map((row) => ({
-    ...row,
-    [xKey]: row[xKey],
-    [yKey]: parseFloat(row[yKey]) || 0,
-  }));
-}
-
 const GRAPH_ICONS: Record<GraphType, React.ReactNode> = {
   bar: <BarChart2 className="h-4 w-4" />,
   line: <TrendingUp className="h-4 w-4" />,
@@ -115,85 +50,31 @@ const GRAPH_ICONS: Record<GraphType, React.ReactNode> = {
   scatter: <Circle className="h-4 w-4" />,
 };
 
-// ---------------------------------------------------------------------------
-// Chart renderers
-// ---------------------------------------------------------------------------
-function renderChart(
-  type: GraphType,
-  data: Record<string, unknown>[],
-  xKey: string,
-  yKey: string
-) {
-  const commonProps = {
-    data,
-    margin: { top: 10, right: 20, left: 0, bottom: 40 },
-  };
-
-  switch (type) {
-    case "bar":
-      return (
-        <BarChart {...commonProps}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-          <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey={yKey} fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
-        </BarChart>
-      );
-    case "line":
-      return (
-        <LineChart {...commonProps}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-          <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip />
-          <Legend />
-          <Line type="monotone" dataKey={yKey} stroke={CHART_COLORS[0]} strokeWidth={2} dot={false} />
-        </LineChart>
-      );
-    case "area":
-      return (
-        <AreaChart {...commonProps}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-          <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip />
-          <Legend />
-          <Area type="monotone" dataKey={yKey} stroke={CHART_COLORS[0]} fill={`${CHART_COLORS[0]}33`} strokeWidth={2} />
-        </AreaChart>
-      );
-    case "pie":
-      return (
-        <PieChart>
-          <Pie data={data} dataKey={yKey} nameKey={xKey} cx="50%" cy="50%" outerRadius={120} label>
-            {data.map((_, i) => (
-              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip />
-          <Legend />
-        </PieChart>
-      );
-    case "scatter":
-      return (
-        <ScatterChart {...commonProps}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis dataKey={xKey} name={xKey} tick={{ fontSize: 11 }} />
-          <YAxis dataKey={yKey} name={yKey} tick={{ fontSize: 11 }} />
-          <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-          <Scatter data={data} fill={CHART_COLORS[0]} />
-        </ScatterChart>
-      );
-    default:
-      return null;
-  }
+interface GraphPreviewProps {
+  tableData: Record<string, string>[];
+  tableColumns: string[];
+  sourceQuestion?: string;
+  sourcePrompt?: string;
+  sourceResponse?: string;
+  /** Initial config when showing an instance from the Graphs tab list */
+  initialGraphType?: GraphType;
+  initialXKey?: string;
+  initialYKey?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export default function GraphPreview({ tableData, tableColumns, sourceQuestion = "" }: GraphPreviewProps) {
+export default function GraphPreview({
+  tableData,
+  tableColumns,
+  sourceQuestion = "",
+  sourcePrompt = "",
+  sourceResponse = "",
+  initialGraphType,
+  initialXKey,
+  initialYKey,
+}: GraphPreviewProps) {
   const { toast } = useToast();
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -203,14 +84,27 @@ export default function GraphPreview({ tableData, tableColumns, sourceQuestion =
   const categoryCols = colMeta.filter((c) => c.isCategorical).map((c) => c.name);
   const allCols = tableColumns;
 
-  const [graphType, setGraphType] = useState<GraphType>(availableTypes[0] || "bar");
-  const [xKey, setXKey] = useState<string>(categoryCols[0] || allCols[0] || "");
-  const [yKey, setYKey] = useState<string>(numericCols[0] || allCols[1] || "");
+  const [graphType, setGraphType] = useState<GraphType>(
+    () => (initialGraphType && availableTypes.includes(initialGraphType) ? initialGraphType : (availableTypes[0] || "bar"))
+  );
+  const [xKey, setXKey] = useState<string>(
+    () => initialXKey || categoryCols[0] || allCols[0] || ""
+  );
+  const [yKey, setYKey] = useState<string>(
+    () => initialYKey || numericCols[0] || allCols[1] || ""
+  );
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
 
   const chartData = prepareChartData(tableData, xKey, yKey);
+
+  // Sync from initial props when they change (e.g. selected graph instance)
+  useEffect(() => {
+    if (initialGraphType && availableTypes.includes(initialGraphType)) setGraphType(initialGraphType);
+    if (initialXKey && tableColumns.includes(initialXKey)) setXKey(initialXKey);
+    if (initialYKey && tableColumns.includes(initialYKey)) setYKey(initialYKey);
+  }, [initialGraphType, initialXKey, initialYKey, tableColumns.join(",")]);
 
   // When graph type changes, suggest valid axes
   useEffect(() => {
@@ -265,7 +159,9 @@ export default function GraphPreview({ tableData, tableColumns, sourceQuestion =
         graph_config: { xKey, yKey, data: chartData, colors: CHART_COLORS },
         table_data: tableData as Record<string, string>[],
         table_columns: tableColumns,
-        source_question: sourceQuestion,
+        source_question: sourceQuestion || sourceResponse,
+        source_prompt: sourcePrompt || "",
+        source_response: sourceResponse || sourceQuestion,
       });
       toast({ title: "Saved", description: "Chart saved to your dashboard." });
     } catch (err) {

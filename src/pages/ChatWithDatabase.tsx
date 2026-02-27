@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -34,7 +35,7 @@ import BookmarkedQuestionsDialog from "@/components/BookmarkedQuestionsDialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Send, Mic, MicOff, Loader2, Star, Maximize2, Minimize2,
-  User, Copy, Check, BookmarkPlus, BarChart3, Sparkles, Download,
+  User, Copy, Check, BookmarkPlus, BarChart3, Sparkles, Download, Trash2,
 } from "lucide-react";
 import {
   getChatHistory,
@@ -47,9 +48,13 @@ import {
   streamDbReport,
   getDbOverview,
   clearDbOverview,
+  getDbGraphs,
+  saveDbGraphs,
   addBookmark,
   type ChatMessageItem,
 } from "@/lib/api";
+import type { GraphType } from "@/lib/chartUtils";
+import ConvertToGraphDialog from "@/components/ConvertToGraphDialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +77,19 @@ interface Message {
   tables?: TableEntry[];
 }
 
+/** One chart instance in the Graphs tab */
+export interface GraphInstance {
+  id: string;
+  tableData: Record<string, string>[];
+  tableColumns: string[];
+  graphType: GraphType;
+  xKey: string;
+  yKey: string;
+  sourceLabel?: string;
+  sourcePrompt?: string;
+  sourceResponse?: string;
+}
+
 // ---------------------------------------------------------------------------
 // SSE parser
 // ---------------------------------------------------------------------------
@@ -86,16 +104,22 @@ function parseSSELine(line: string): { type: string; [key: string]: unknown } | 
 // ---------------------------------------------------------------------------
 function TableActions({
   message,
-  onConvertToGraph,
+  sourcePrompt,
+  onOpenConvertDialog,
+  onSaveToDashboard,
 }: {
   message: Message;
-  onConvertToGraph: (msg: Message, tableIndex: number) => void;
+  sourcePrompt: string;
+  onOpenConvertDialog: (msg: Message, sourcePrompt: string) => void;
+  /** When multiple tables, (tableIndex | 'all') and name; when single table, just name. */
+  onSaveToDashboard: (msg: Message, name: string, tableIndexOrAll: number | "all" | undefined, sourcePrompt: string) => void | Promise<void>;
 }) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
-  // Which table to use for Convert to Graph (when multiple tables present)
+  const [saveChoiceModalOpen, setSaveChoiceModalOpen] = useState(false);
+  const [saveChoice, setSaveChoice] = useState<number | "all">(0);
   const [selectedTableIdx, setSelectedTableIdx] = useState(0);
 
   const tables = message.tables && message.tables.length > 0 ? message.tables : null;
@@ -117,20 +141,29 @@ function TableActions({
     });
   };
 
-  const handleSaveConfirm = async (name: string) => {
-    if (!message.table_data || !message.table_columns) return;
+  const handleSaveClick = () => {
+    if (tables && tables.length > 1) {
+      setSaveChoice(0);
+      setSaveChoiceModalOpen(true);
+    } else {
+      setSaveModalOpen(true);
+    }
+  };
+
+  const handleSaveChoiceConfirm = () => {
+    setSaveChoiceModalOpen(false);
+    setSaveModalOpen(true);
+  };
+
+  const handleSaveConfirmSingleOrChosen = async (name: string) => {
     setSaving(true);
-    console.log(`[TableActions] Saving table "${name}" to dashboard`);
     try {
-      // If multi-table, save the selected table; otherwise save the first/only table
-      const tableToSave = tables ? tables[selectedTableIdx] : null;
-      await saveDashboardTable({
-        name,
-        table_data: tableToSave ? tableToSave.data : message.table_data,
-        table_columns: tableToSave ? tableToSave.columns : message.table_columns,
-        source_question: message.content.slice(0, 200),
-      });
-      toast({ title: "Saved", description: "Table saved to your dashboard." });
+      await onSaveToDashboard(message, name, tables && tables.length > 1 ? saveChoice : undefined, sourcePrompt);
+      if (tables && tables.length > 1 && saveChoice === "all") {
+        toast({ title: "Saved", description: `${tables.length} tables saved to your dashboard.` });
+      } else {
+        toast({ title: "Saved", description: "Table saved to your dashboard." });
+      }
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
     } finally {
@@ -139,7 +172,7 @@ function TableActions({
   };
 
   const handleConvertToGraph = () => {
-    onConvertToGraph(message, selectedTableIdx);
+    onOpenConvertDialog(message, sourcePrompt);
   };
 
   return (
@@ -172,7 +205,7 @@ function TableActions({
           size="sm"
           variant="outline"
           className="h-7 text-xs gap-1.5"
-          onClick={() => setSaveModalOpen(true)}
+          onClick={handleSaveClick}
           disabled={saving}
         >
           {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookmarkPlus className="h-3 w-3" />}
@@ -184,11 +217,47 @@ function TableActions({
         </Button>
       </div>
 
+      {/* Which table(s) to save — when multiple tables */}
+      {tables && tables.length > 1 && (
+        <Dialog open={saveChoiceModalOpen} onOpenChange={setSaveChoiceModalOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Which table(s) to save?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              {tables.map((t, i) => (
+                <Button
+                  key={i}
+                  variant={saveChoice === i ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => setSaveChoice(i)}
+                >
+                  Table {i + 1} ({t.columns.length} cols)
+                </Button>
+              ))}
+              <Button
+                variant={saveChoice === "all" ? "default" : "outline"}
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => setSaveChoice("all")}
+              >
+                All tables ({tables.length})
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSaveChoiceModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveChoiceConfirm}>Continue</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       <SaveNameModal
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
-        onConfirm={handleSaveConfirm}
-        title="Save Table to Dashboard"
+        onConfirm={handleSaveConfirmSingleOrChosen}
+        title={tables && tables.length > 1 && saveChoice === "all" ? "Base name for all tables" : "Save Table to Dashboard"}
         placeholder="e.g. Monthly Sales by Region"
         defaultName={`Query result — ${new Date().toLocaleString()}`}
       />
@@ -202,11 +271,12 @@ function TableActions({
 interface ChatPanelProps {
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
-  onConvertToGraph: (msg: Message) => void;
+  onOpenConvertDialog: (msg: Message, sourcePrompt: string) => void;
+  onSaveToDashboard: (msg: Message, name: string, tableIndexOrAll: number | "all" | undefined, sourcePrompt: string) => void | Promise<void>;
   onSwitchToGraphTab: () => void;
 }
 
-function ChatPanel({ isFullscreen, onToggleFullscreen, onConvertToGraph, onSwitchToGraphTab }: ChatPanelProps) {
+function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSaveToDashboard, onSwitchToGraphTab }: ChatPanelProps) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -214,6 +284,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onConvertToGraph, onSwitc
   const [isRecording, setIsRecording] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [bookmarkRefreshTrigger, setBookmarkRefreshTrigger] = useState(0);
+  const lastUserPromptRef = useRef<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll
@@ -269,6 +340,9 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onConvertToGraph, onSwitc
     if (!textToSend.trim() || isLoading) return;
 
     console.log("[ChatPanel] Sending:", textToSend.slice(0, 80));
+
+    // Track latest user prompt for downstream save-to-dashboard metadata
+    lastUserPromptRef.current = textToSend;
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -389,18 +463,23 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onConvertToGraph, onSwitc
     setInput(question);
   };
 
-  const handleConvertToGraph = (msg: Message, tableIndex: number) => {
-    console.log(`[ChatPanel] Convert to graph (table ${tableIndex}), switching right panel tab`);
-    // Build a synthetic message that points to the selected table
-    const targetMsg: Message = tableIndex === 0 || !msg.tables
-      ? msg
-      : {
-          ...msg,
-          table_data: msg.tables[tableIndex].data,
-          table_columns: msg.tables[tableIndex].columns,
-        };
-    onConvertToGraph(targetMsg);
-    onSwitchToGraphTab();
+  const handleOpenConvertDialog = (msg: Message) => {
+    // Prefer the nearest preceding user message as the prompt for this reply
+    let prompt = lastUserPromptRef.current;
+    const idx = messages.findIndex((m) => m.id === msg.id);
+    if (idx > 0) {
+      for (let i = idx - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          prompt = messages[i].content;
+          break;
+        }
+      }
+    }
+    onOpenConvertDialog(msg, prompt);
+  };
+
+  const handleSaveToDashboardFromChat = async (msg: Message, name: string, tableIndexOrAll: number | "all" | undefined) => {
+    await onSaveToDashboard(msg, name, tableIndexOrAll, lastUserPromptRef.current);
   };
 
   // -------------------------------------------------------------------------
@@ -494,7 +573,12 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onConvertToGraph, onSwitc
                       </div>
                       {/* Table actions rendered OUTSIDE the bubble */}
                       {!message.isStreaming && message.has_table && (
-                        <TableActions message={message} onConvertToGraph={handleConvertToGraph} />
+                        <TableActions
+                          message={message}
+                          sourcePrompt={lastUserPromptRef.current}
+                          onOpenConvertDialog={handleOpenConvertDialog}
+                          onSaveToDashboard={handleSaveToDashboardFromChat}
+                        />
                       )}
                     </div>
                   </div>
@@ -555,12 +639,24 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onConvertToGraph, onSwitc
 interface DatabaseTabsProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  graphSourceMessage: Message | null;
+  graphInstances: GraphInstance[];
+  selectedGraphId: string | null;
+  onSelectGraph: (id: string | null) => void;
+  onRemoveGraph: (id: string) => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
 }
 
-function DatabaseTabs({ activeTab, onTabChange, graphSourceMessage, isFullscreen, onToggleFullscreen }: DatabaseTabsProps) {
+function DatabaseTabs({
+  activeTab,
+  onTabChange,
+  graphInstances,
+  selectedGraphId,
+  onSelectGraph,
+  onRemoveGraph,
+  isFullscreen,
+  onToggleFullscreen,
+}: DatabaseTabsProps) {
   const { toast } = useToast();
 
   // Summary state
@@ -719,13 +815,12 @@ function DatabaseTabs({ activeTab, onTabChange, graphSourceMessage, isFullscreen
     console.log("[DatabaseTabs] Generating DB report (persisted)...");
     setIsGeneratingReport(true);
     setReportText("");
-    setReportSaved(false);
     try {
       const reader = await streamDbReport();
       await readStream(
         reader,
         (t) => setReportText(t),
-        (full) => { setReportText(full); setReportSaved(true); },
+        (full) => setReportText(full),
       );
     } catch (err) {
       console.error("[DatabaseTabs] Report generation error:", err);
@@ -963,22 +1058,63 @@ function DatabaseTabs({ activeTab, onTabChange, graphSourceMessage, isFullscreen
                   Visualizations
                 </CardTitle>
                 <CardDescription>
-                  {graphSourceMessage
-                    ? "Configure and preview your chart below"
-                    : 'Ask a question in the chat that returns tabular data, then click "Convert to Graph"'}
+                  {graphInstances.length > 0
+                    ? "Select a chart below to view or edit"
+                    : 'Ask a question that returns tabular data, then click "Convert to Graph"'}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
-                {graphSourceMessage ? (
-                  <ScrollArea className="h-full">
-                    <GraphPreview
-                      tableData={graphSourceMessage.table_data || []}
-                      tableColumns={graphSourceMessage.table_columns || []}
-                      sourceQuestion={graphSourceMessage.content}
-                    />
-                  </ScrollArea>
+              <CardContent className="flex-1 overflow-hidden flex gap-2 min-h-0 p-4">
+                {graphInstances.length > 0 ? (
+                  <>
+                    <div className="flex-shrink-0 w-40 border-r pr-2 overflow-y-auto space-y-1">
+                      {graphInstances.map((inst) => (
+                        <div
+                          key={inst.id}
+                          className={`flex items-center gap-1 rounded-lg border p-2 text-xs cursor-pointer transition-colors ${
+                            selectedGraphId === inst.id ? "bg-primary/10 border-primary" : "hover:bg-muted/50"
+                          }`}
+                          onClick={() => onSelectGraph(inst.id)}
+                        >
+                          <BarChart3 className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span className="truncate flex-1 min-w-0">
+                            {inst.sourceLabel || `Chart ${inst.id.slice(-6)}`}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 flex-shrink-0"
+                            onClick={(e) => { e.stopPropagation(); onRemoveGraph(inst.id); }}
+                            title="Remove"
+                          >
+                            <Trash2 className="h-3 w-3 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      {selectedGraphId && (() => {
+                        const inst = graphInstances.find((g) => g.id === selectedGraphId);
+                        if (!inst) return null;
+                        return (
+                          <ScrollArea className="h-full">
+                            <GraphPreview
+                              key={inst.id}
+                              tableData={inst.tableData}
+                              tableColumns={inst.tableColumns}
+                              sourceQuestion={inst.sourceLabel}
+                              sourcePrompt={inst.sourcePrompt || ""}
+                              sourceResponse={inst.sourceResponse || inst.sourceLabel || ""}
+                              initialGraphType={inst.graphType}
+                              initialXKey={inst.xKey}
+                              initialYKey={inst.yKey}
+                            />
+                          </ScrollArea>
+                        );
+                      })()}
+                    </div>
+                  </>
                 ) : (
-                  <div className="h-full border rounded-lg bg-muted flex items-center justify-center">
+                  <div className="h-full border rounded-lg bg-muted flex items-center justify-center flex-1">
                     <div className="text-center">
                       <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                       <p className="text-muted-foreground">No visualizations yet</p>
@@ -1071,10 +1207,118 @@ export default function ChatWithDatabase() {
   const [leftWidth, setLeftWidth] = useState(40);
   const [chatFullscreen, setChatFullscreen] = useState(false);
   const [tabsFullscreen, setTabsFullscreen] = useState(false);
-  const [graphSourceMessage, setGraphSourceMessage] = useState<Message | null>(null);
+  const [graphInstances, setGraphInstances] = useState<GraphInstance[]>([]);
+  const [selectedGraphId, setSelectedGraphId] = useState<string | null>(null);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [convertDialogMessage, setConvertDialogMessage] = useState<Message | null>(null);
+  const [convertDialogPrompt, setConvertDialogPrompt] = useState<string>("");
   const [activeRightTab, setActiveRightTab] = useState("overview");
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const graphsInitialLoadDoneRef = useRef(false);
+
+  // Load persisted graphs from DB on mount
+  useEffect(() => {
+    let cancelled = false;
+    getDbGraphs()
+      .then((graphs) => {
+        if (cancelled) return;
+        const valid = Array.isArray(graphs) ? graphs : [];
+        const instances: GraphInstance[] = valid
+          .filter((g) => g && g.id && Array.isArray(g.table_data) && Array.isArray(g.table_columns))
+          .map((g) => ({
+            id: g.id,
+            tableData: g.table_data as Record<string, string>[],
+            tableColumns: g.table_columns,
+            graphType: g.graph_type as GraphType,
+            xKey: g.xKey || "",
+            yKey: g.yKey || "",
+            sourceLabel: g.source_label,
+          }));
+        setGraphInstances(instances);
+        if (instances.length > 0) setSelectedGraphId(instances[0].id);
+        graphsInitialLoadDoneRef.current = true;
+      })
+      .catch((err) => {
+        console.warn("[ChatWithDatabase] Failed to load graphs from DB:", err);
+        graphsInitialLoadDoneRef.current = true;
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist graphs to DB whenever graphInstances changes (after initial load)
+  useEffect(() => {
+    if (!graphsInitialLoadDoneRef.current) return;
+    const payload = graphInstances.map((g) => ({
+      id: g.id,
+      table_data: g.tableData,
+      table_columns: g.tableColumns,
+      graph_type: g.graphType,
+      xKey: g.xKey,
+      yKey: g.yKey,
+      source_label: g.sourceLabel ?? null,
+    }));
+    saveDbGraphs(payload).catch((err) => console.warn("[ChatWithDatabase] Failed to save graphs:", err));
+  }, [graphInstances]);
+
+  const handleConvertDialogConfirm = (config: { tableIndex: number; graphType: GraphType; xKey: string; yKey: string }) => {
+    const msg = convertDialogMessage;
+    if (!msg) return;
+    const tables = msg.tables && msg.tables.length > 0 ? msg.tables : null;
+    const { tableData, tableColumns } = tables
+      ? { tableData: tables[config.tableIndex].data, tableColumns: tables[config.tableIndex].columns }
+      : { tableData: msg.table_data || [], tableColumns: msg.table_columns || [] };
+    const id = `graph-${Date.now()}`;
+    const fullResponse = msg.content || "";
+    const sourceLabel = fullResponse.slice(0, 40).trim() || "Chart";
+    setGraphInstances((prev) => [
+      ...prev,
+      {
+        id,
+        tableData,
+        tableColumns,
+        graphType: config.graphType,
+        xKey: config.xKey,
+        yKey: config.yKey,
+        sourceLabel,
+        sourcePrompt: convertDialogPrompt,
+        sourceResponse: fullResponse,
+      },
+    ]);
+    setSelectedGraphId(id);
+    setConvertDialogOpen(false);
+    setConvertDialogMessage(null);
+    setActiveRightTab("graphs");
+  };
+
+const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll: number | "all" | undefined, sourcePrompt: string) => {
+    const tables = msg.tables && msg.tables.length > 0 ? msg.tables : null;
+  const fullResponse = msg.content || "";
+  const sourceQuestion = fullResponse; // keep snippet & full identical for now
+    if (tables && tableIndexOrAll === "all") {
+      for (let i = 0; i < tables.length; i++) {
+        await saveDashboardTable({
+          name: `${name} — Table ${i + 1}`,
+          table_data: tables[i].data,
+          table_columns: tables[i].columns,
+          source_question: sourceQuestion,
+        source_prompt: sourcePrompt,
+        source_response: fullResponse,
+        });
+      }
+      return;
+    }
+    const idx = typeof tableIndexOrAll === "number" ? tableIndexOrAll : 0;
+    const tableToSave = tables ? tables[idx] : null;
+    await saveDashboardTable({
+      name,
+      table_data: tableToSave ? tableToSave.data : (msg.table_data || []),
+      table_columns: tableToSave ? tableToSave.columns : (msg.table_columns || []),
+      source_question: sourceQuestion,
+    source_prompt: sourcePrompt,
+    source_response: fullResponse,
+    });
+  };
 
   const handleMouseDown = () => {
     if (chatFullscreen || tabsFullscreen) return;
@@ -1128,10 +1372,12 @@ export default function ChatWithDatabase() {
             <ChatPanel
               isFullscreen={chatFullscreen}
               onToggleFullscreen={toggleChatFullscreen}
-              onConvertToGraph={(msg) => {
-                console.log("[ChatWithDatabase] Graph source set:", msg.id);
-                setGraphSourceMessage(msg);
+              onOpenConvertDialog={(msg, sourcePrompt) => {
+                setConvertDialogMessage(msg);
+                setConvertDialogPrompt(sourcePrompt);
+                setConvertDialogOpen(true);
               }}
+              onSaveToDashboard={handleSaveToDashboard}
               onSwitchToGraphTab={() => setActiveRightTab("graphs")}
             />
           </div>
@@ -1154,13 +1400,26 @@ export default function ChatWithDatabase() {
             <DatabaseTabs
               activeTab={activeRightTab}
               onTabChange={setActiveRightTab}
-              graphSourceMessage={graphSourceMessage}
+              graphInstances={graphInstances}
+              selectedGraphId={selectedGraphId}
+              onSelectGraph={setSelectedGraphId}
+              onRemoveGraph={(id) => {
+                const next = graphInstances.filter((g) => g.id !== id);
+                setGraphInstances(next);
+                if (selectedGraphId === id) setSelectedGraphId(next[0]?.id ?? null);
+              }}
               isFullscreen={tabsFullscreen}
               onToggleFullscreen={toggleTabsFullscreen}
             />
           </div>
         )}
       </div>
+      <ConvertToGraphDialog
+        open={convertDialogOpen}
+        onClose={() => { setConvertDialogOpen(false); setConvertDialogMessage(null); }}
+        message={convertDialogMessage}
+        onConfirm={handleConvertDialogConfirm}
+      />
     </div>
   );
 }
