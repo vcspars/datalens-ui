@@ -51,6 +51,7 @@ import {
   getDbGraphs,
   saveDbGraphs,
   addBookmark,
+  downloadDbReportPdf,
   type ChatMessageItem,
 } from "@/lib/api";
 import type { GraphType } from "@/lib/chartUtils";
@@ -891,15 +892,19 @@ function DatabaseTabs({
     }
   };
 
-  const handleDownloadReport = () => {
-    if (!reportText) return;
-    const blob = new Blob([reportText], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `database-report-${Date.now()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownloadReport = async () => {
+    try {
+      const blob = await downloadDbReportPdf();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `database-report-${Date.now()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[DatabaseTabs] Failed to download DB report PDF:", err);
+      toast({ title: "Download failed", description: String(err), variant: "destructive" });
+    }
   };
 
   // ---- Regenerate — clears persisted data for the chosen section and re-runs ----

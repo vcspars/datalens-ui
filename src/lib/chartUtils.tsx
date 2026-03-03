@@ -22,6 +22,10 @@ export const CHART_COLORS = [
   "#06b6d4", "#f97316", "#84cc16", "#ec4899", "#14b8a6",
 ];
 
+const legendFormatter = (value: string) => (
+  <span style={{ fontSize: 10 }}>{value}</span>
+);
+
 export function detectColumnMeta(data: Record<string, string>[], columns: string[]): ColumnMeta[] {
   return columns.map((col) => {
     const values = data.map((r) => r[col]).filter((v) => v !== undefined && v !== "");
@@ -74,7 +78,7 @@ export function renderChart(
 ): React.ReactNode {
   const commonProps = {
     data,
-    margin: { top: 10, right: 20, left: 0, bottom: 40 },
+    margin: { top: 20, right: 20, left: 20, bottom: 40 },
   };
 
   switch (type) {
@@ -85,7 +89,7 @@ export function renderChart(
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip />
-          <Legend />
+          <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Bar dataKey={yKey} fill={colors[0]} radius={[4, 4, 0, 0]} />
         </BarChart>
       );
@@ -96,7 +100,7 @@ export function renderChart(
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip />
-          <Legend />
+          <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Line type="monotone" dataKey={yKey} stroke={colors[0]} strokeWidth={2} dot={false} />
         </LineChart>
       );
@@ -107,20 +111,28 @@ export function renderChart(
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip />
-          <Legend />
+          <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Area type="monotone" dataKey={yKey} stroke={colors[0]} fill={`${colors[0]}33`} strokeWidth={2} />
         </AreaChart>
       );
     case "pie":
       return (
-        <PieChart>
-          <Pie data={data} dataKey={yKey} nameKey={xKey} cx="50%" cy="50%" outerRadius={120} label>
+        <PieChart margin={{ top: 40, right: 16, bottom: 32, left: 16 }}>
+          <Pie
+            data={data}
+            dataKey={yKey}
+            nameKey={xKey}
+            cx="50%"
+            cy="55%"
+            outerRadius={80}
+            label
+          >
             {data.map((_, i) => (
               <Cell key={i} fill={colors[i % colors.length]} />
             ))}
           </Pie>
           <Tooltip />
-          <Legend />
+          <Legend wrapperStyle={{ marginTop: 20 }} formatter={legendFormatter} />
         </PieChart>
       );
     case "scatter":
@@ -130,6 +142,7 @@ export function renderChart(
           <XAxis dataKey={xKey} name={xKey} tick={{ fontSize: 11 }} />
           <YAxis dataKey={yKey} name={yKey} tick={{ fontSize: 11 }} />
           <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+          <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Scatter data={data} fill={colors[0]} />
         </ScatterChart>
       );

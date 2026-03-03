@@ -26,6 +26,7 @@ import {
   deleteDashboardReport,
   streamGenerateReport,
   saveDashboardReport,
+  downloadDashboardReportPdf,
   type DashboardItemOut,
 } from "@/lib/api";
 
@@ -43,23 +44,14 @@ function parseSSELine(line: string): { type: string; [key: string]: unknown } | 
 // ---------------------------------------------------------------------------
 function ViewReportModal({
   report,
+  selectedItems,
   onClose,
 }: {
   report: DashboardItemOut | null;
+  selectedItems: DashboardItemOut[];
   onClose: () => void;
 }) {
   if (!report) return null;
-
-  const handleDownload = () => {
-    console.log("[ViewReportModal] Downloading report:", report.name);
-    const blob = new Blob([report.report_content || ""], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${report.name.replace(/\s+/g, "-").toLowerCase()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <Dialog open={!!report} onOpenChange={(v) => !v && onClose()}>
@@ -70,14 +62,32 @@ function ViewReportModal({
             {report.name}
           </DialogTitle>
         </DialogHeader>
-        <div className="flex-1 border rounded-lg p-4 bg-muted/20 max-h-[60vh] overflow-auto">
-          <MarkdownMessage content={report.report_content || "No content available."} />
+        <div className="flex-1 border rounded-lg p-4 bg-muted/20 max-h-[60vh] overflow-auto space-y-4">
+          <div>
+            <MarkdownMessage content={report.report_content || "No content available."} />
+          </div>
+          {selectedItems.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Selected Items</h3>
+              <ul className="space-y-1 text-xs">
+                {selectedItems.map((item) => (
+                  <li key={item.id} className="flex justify-between gap-2 border-b border-border/40 pb-1">
+                    <span className="truncate">
+                      {item.name}{" "}
+                      <span className="text-muted-foreground">
+                        ({item.item_type}{item.graph_type ? ` · ${item.graph_type}` : ""})
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground whitespace-nowrap">
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <DialogFooter className="gap-2 flex-shrink-0">
-          <Button variant="outline" onClick={handleDownload} className="gap-2">
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
           <Button onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
@@ -186,7 +196,12 @@ export default function MyDashboard() {
     }
 
     if (accumulated) {
-      await saveDashboardReport({ name: reportName, content: accumulated, template: "executive" });
+      await saveDashboardReport({
+        name: reportName,
+        content: accumulated,
+        template: "executive",
+        item_ids: selectedItemIds,
+      });
       console.log("[MyDashboard] Report saved:", reportName);
       await loadData();
     }
@@ -225,6 +240,13 @@ export default function MyDashboard() {
 
   const hasResponse =
     !!(metaItem?.source_response && metaItem.source_response.trim().length > 0);
+
+  const getSelectedItemsForReport = (report: DashboardItemOut | null): DashboardItemOut[] => {
+    if (!report?.metadata) return [];
+    const rawIds = (report.metadata["item_ids"] as string[] | undefined) ?? [];
+    if (!Array.isArray(rawIds) || rawIds.length === 0) return [];
+    return items.filter((i) => rawIds.includes(i.id));
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -400,7 +422,7 @@ export default function MyDashboard() {
                             </div>
                           </div>
                       ) : item.item_type === "graph" && item.graph_config && item.graph_type ? (
-                        <div className="h-72 bg-muted rounded-lg overflow-hidden mb-3 mt-1">
+                        <div className="h-72 bg-muted rounded-lg mb-3 mt-1">
                           <ResponsiveContainer width="100%" height="100%">
                             {renderChart(
                               item.graph_type as GraphType,
@@ -481,15 +503,20 @@ export default function MyDashboard() {
                           variant="outline"
                           size="sm"
                           className="w-full gap-2"
-                          onClick={() => {
-                            console.log("[MyDashboard] Downloading report:", report.id);
-                            const blob = new Blob([report.report_content || ""], { type: "text/markdown" });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `${report.name.replace(/\s+/g, "-").toLowerCase()}.md`;
-                            a.click();
-                            URL.revokeObjectURL(url);
+                          onClick={async () => {
+                            console.log("[MyDashboard] Downloading report PDF:", report.id);
+                            try {
+                              const blob = await downloadDashboardReportPdf(report.id);
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `${report.name.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            } catch (err) {
+                              console.error("[MyDashboard] Report PDF download failed:", err);
+                              toast({ title: "Download failed", description: String(err), variant: "destructive" });
+                            }
                           }}
                         >
                           <Download className="h-4 w-4" />
@@ -515,7 +542,11 @@ export default function MyDashboard() {
       </div>
 
       {/* View Report Modal */}
-      <ViewReportModal report={viewReport} onClose={() => setViewReport(null)} />
+      <ViewReportModal
+        report={viewReport}
+        selectedItems={getSelectedItemsForReport(viewReport)}
+        onClose={() => setViewReport(null)}
+      />
 
       {/* Large preview modal for saved items */}
       <Dialog open={!!previewItem} onOpenChange={(v) => !v && setPreviewItem(null)}>
@@ -573,7 +604,7 @@ export default function MyDashboard() {
                 </div>
               </div>
             ) : previewItem?.item_type === "graph" && previewItem.graph_config && previewItem.graph_type ? (
-              <div className="h-[420px] border rounded-lg bg-muted overflow-hidden">
+              <div className="h-[420px] border rounded-lg bg-muted">
                 <ResponsiveContainer width="100%" height="100%">
                   {renderChart(
                     previewItem.graph_type as GraphType,

@@ -236,6 +236,26 @@ export const streamDbReport = async (): Promise<ReadableStreamDefaultReader<Uint
   return response.body.getReader();
 };
 
+export const downloadDbReportPdf = async (): Promise<Blob> => {
+  const token = getAuthToken();
+  console.log("[API] downloadDbReportPdf");
+  const response = await fetch(`${API_BASE_URL}/chat/db/report/pdf`, {
+    method: "GET",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    let msg = response.statusText;
+    try {
+      const err = await response.json();
+      msg = err.detail || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await response.blob();
+};
+
 export const streamDbSummary = async (): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
   const token = getAuthToken();
   console.log("[API] streamDbSummary");
@@ -315,6 +335,7 @@ export interface DashboardItemOut {
   source_question?: string;
   source_prompt?: string;
   source_response?: string;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 
@@ -379,12 +400,33 @@ export const saveDashboardReport = async (payload: {
   name: string;
   content: string;
   template: string;
+  item_ids?: string[];
 }): Promise<{ id: string; message: string }> => {
   console.log("[API] saveDashboardReport:", payload.name);
   return apiRequest<{ id: string; message: string }>("/dashboard/reports/save", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+};
+
+export const downloadDashboardReportPdf = async (reportId: string): Promise<Blob> => {
+  const token = getAuthToken();
+  console.log("[API] downloadDashboardReportPdf:", reportId);
+  const response = await fetch(`${API_BASE_URL}/dashboard/reports/${reportId}/pdf`, {
+    method: "GET",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    let msg = response.statusText;
+    try {
+      const err = await response.json();
+      msg = err.detail || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await response.blob();
 };
 
 /**

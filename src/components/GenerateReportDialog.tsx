@@ -60,7 +60,7 @@ export default function GenerateReportDialog({ items, onGenerate }: GenerateRepo
       await onGenerate(reportName, selectedItems, instructions);
       toast({
         title: "Success",
-        description: "Report is being generated",
+        description: "Report is generated successfully. View in My Reports section.",
       });
       setOpen(false);
       // Reset form
@@ -166,7 +166,7 @@ export default function GenerateReportDialog({ items, onGenerate }: GenerateRepo
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="instructions">Report Instructions (Optional)</Label>
+            <Label htmlFor="instructions">Report Instructions *</Label>
             <Textarea
               id="instructions"
               placeholder="Provide any specific instructions for the report generation. E.g., 'Include executive summary, focus on trends, highlight key insights from the selected graphs and tables...'"
