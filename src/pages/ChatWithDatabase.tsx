@@ -76,6 +76,8 @@ interface Message {
   table_columns?: string[];
   // All tables parsed from this message
   tables?: TableEntry[];
+  /** Generated SQL for this response (from Vanna or LangChain) */
+  sql_query?: string;
 }
 
 /** One chart instance in the Graphs tab */
@@ -286,6 +288,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const [historyLoading, setHistoryLoading] = useState(true);
   const [bookmarkRefreshTrigger, setBookmarkRefreshTrigger] = useState(0);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [sqlPopupMessage, setSqlPopupMessage] = useState<Message | null>(null);
   const lastUserPromptRef = useRef<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -327,6 +330,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             table_data: m.table_data as Record<string, string>[],
             table_columns: m.table_columns,
             tables: m.tables as TableEntry[] | undefined,
+            sql_query: m.sql_query,
           }));
           setMessages([welcome, ...historyMessages]);
         }
@@ -383,6 +387,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     let tableData: Record<string, string>[] = [];
     let tableColumns: string[] = [];
     let allTables: TableEntry[] = [];
+    let sqlQuery = "";
 
     try {
       const reader = await streamChat(textToSend);
@@ -414,7 +419,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             tableData = (event.table_data as Record<string, string>[]) || [];
             tableColumns = (event.table_columns as string[]) || [];
             allTables = (event.tables as TableEntry[]) || [];
-            console.log(`[ChatPanel] Done | has_table=${hasTable} | tables=${allTables.length}`);
+            sqlQuery = (event.sql_query as string) || "";
+            console.log(`[ChatPanel] Done | has_table=${hasTable} | tables=${allTables.length} | sql_query=${!!sqlQuery}`);
           } else if (event.type === "error") {
             console.error("[ChatPanel] SSE error:", event.content);
             toast({ title: "Error", description: event.content as string, variant: "destructive" });
@@ -424,7 +430,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
 
       setMessages(prev => prev.map(m =>
         m.id === assistantId
-          ? { ...m, content: fullContent, isStreaming: false, has_table: hasTable, table_data: tableData, table_columns: tableColumns, tables: allTables }
+          ? { ...m, content: fullContent, isStreaming: false, has_table: hasTable, table_data: tableData, table_columns: tableColumns, tables: allTables, sql_query: sqlQuery || undefined }
           : m
       ));
     } catch (err) {
@@ -615,15 +621,15 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                       {/* Actions rendered OUTSIDE the bubble */}
                       {!message.isStreaming && (
                         <>
-                          {message.has_table ? (
-                            <TableActions
-                              message={message}
-                              sourcePrompt={getPromptForMessage(message)}
-                              onOpenConvertDialog={handleOpenConvertDialog}
-                              onSaveToDashboard={handleSaveToDashboardFromChat}
-                            />
-                          ) : message.role === "assistant" && message.content && message.id !== "welcome" ? (
-                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap pl-1">
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap pl-1">
+                            {message.has_table ? (
+                              <TableActions
+                                message={message}
+                                sourcePrompt={getPromptForMessage(message)}
+                                onOpenConvertDialog={handleOpenConvertDialog}
+                                onSaveToDashboard={handleSaveToDashboardFromChat}
+                              />
+                            ) : message.role === "assistant" && message.content && message.id !== "welcome" ? (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -637,8 +643,19 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                                 )}
                                 {copiedMessageId === message.id ? "Copied" : "Copy"}
                               </Button>
-                            </div>
-                          ) : null}
+                            ) : null}
+                            {message.sql_query && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5"
+                                onClick={() => setSqlPopupMessage(message)}
+                                aria-label="View SQL"
+                              >
+                                SQL
+                              </Button>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>
@@ -691,6 +708,36 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
           </div>
         </div>
       </div>
+
+      {/* SQL popup: single dialog for viewing generated SQL */}
+      <Dialog open={!!sqlPopupMessage} onOpenChange={(open) => !open && setSqlPopupMessage(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Generated SQL</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto rounded-md bg-muted p-3 min-h-[120px]">
+            <pre className="text-xs sm:text-sm whitespace-pre-wrap break-all font-mono">
+              <code>{sqlPopupMessage?.sql_query ?? ""}</code>
+            </pre>
+          </div>
+          <DialogFooter>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (sqlPopupMessage?.sql_query) navigator.clipboard.writeText(sqlPopupMessage.sql_query);
+                toast({ title: "Copied", description: "SQL copied to clipboard." });
+              }}
+            >
+              <Copy className="h-3 w-3 mr-1" />
+              Copy
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setSqlPopupMessage(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

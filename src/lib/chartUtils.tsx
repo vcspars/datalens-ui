@@ -26,10 +26,17 @@ const legendFormatter = (value: string) => (
   <span style={{ fontSize: 10 }}>{value}</span>
 );
 
+/** Strip $, commas, currency symbols before parsing so values like $10,000 or 10,000 parse correctly. */
+function parseNumericValue(raw: string): number {
+  if (!raw || typeof raw !== "string") return NaN;
+  const cleaned = String(raw).replace(/[$€£¥,\s]/g, "").trim();
+  return parseFloat(cleaned);
+}
+
 export function detectColumnMeta(data: Record<string, string>[], columns: string[]): ColumnMeta[] {
   return columns.map((col) => {
     const values = data.map((r) => r[col]).filter((v) => v !== undefined && v !== "");
-    const numericCount = values.filter((v) => !isNaN(parseFloat(v))).length;
+    const numericCount = values.filter((v) => !isNaN(parseNumericValue(v))).length;
     const uniqueValues = new Set(values);
     return {
       name: col,
@@ -65,7 +72,7 @@ export function prepareChartData(
   return data.slice(0, 100).map((row) => ({
     ...row,
     [xKey]: row[xKey],
-    [yKey]: parseFloat(row[yKey]) || 0,
+    [yKey]: parseNumericValue(row[yKey]) || 0,
   }));
 }
 

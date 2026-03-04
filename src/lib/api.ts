@@ -9,6 +9,20 @@ export const getAuthToken = (): string | null => localStorage.getItem("auth_toke
 export const setAuthToken = (token: string): void => localStorage.setItem("auth_token", token);
 export const removeAuthToken = (): void => localStorage.removeItem("auth_token");
 
+/**
+ * Call after fetch(); on 401 removes token and redirects to login.
+ * Throw so caller does not continue with expired session.
+ */
+function handleAuthError(response: Response): void {
+  if (response.status === 401) {
+    removeAuthToken();
+    if (typeof window !== "undefined") {
+      window.location.href = "http://localhost:8080/auth";
+    }
+    throw new Error("Session expired. Redirecting to login...");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Generic request helper
 // ---------------------------------------------------------------------------
@@ -126,6 +140,7 @@ export interface ChatMessageItem {
   table_data: Record<string, string>[];
   table_columns: string[];
   tables?: { columns: string[]; data: Record<string, string>[] }[];
+  sql_query?: string;
   created_at: string;
 }
 
@@ -231,6 +246,7 @@ export const streamDbReport = async (): Promise<ReadableStreamDefaultReader<Uint
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  handleAuthError(response);
   if (!response.ok) throw new Error(response.statusText);
   if (!response.body) throw new Error("No response body");
   return response.body.getReader();
@@ -245,6 +261,7 @@ export const downloadDbReportPdf = async (): Promise<Blob> => {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  handleAuthError(response);
   if (!response.ok) {
     let msg = response.statusText;
     try {
@@ -266,6 +283,7 @@ export const streamDbSummary = async (): Promise<ReadableStreamDefaultReader<Uin
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  handleAuthError(response);
   if (!response.ok) throw new Error(response.statusText);
   if (!response.body) throw new Error("No response body");
   return response.body.getReader();
@@ -281,6 +299,7 @@ export const streamDbQuestions = async (): Promise<ReadableStreamDefaultReader<U
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  handleAuthError(response);
   if (!response.ok) throw new Error(response.statusText);
   if (!response.body) throw new Error("No response body");
   return response.body.getReader();
@@ -305,6 +324,7 @@ export const streamChat = async (
     body: JSON.stringify({ question }),
   });
 
+  handleAuthError(response);
   if (!response.ok) {
     let msg = response.statusText;
     try {
@@ -418,6 +438,7 @@ export const downloadDashboardReportPdf = async (reportId: string): Promise<Blob
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  handleAuthError(response);
   if (!response.ok) {
     let msg = response.statusText;
     try {
@@ -450,6 +471,7 @@ export const streamGenerateReport = async (payload: {
     body: JSON.stringify(payload),
   });
 
+  handleAuthError(response);
   if (!response.ok) {
     let msg = response.statusText;
     try {
