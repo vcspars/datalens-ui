@@ -878,7 +878,7 @@ function DatabaseTabs({
         .map((l) => l.replace(/^\d+[\.\)]\s*/, "").trim())
         .filter((l) => l.length > 10);
       console.log("[DatabaseTabs] Parsed questions:", parsed);
-      setQuestions(parsed.slice(0, 5));
+      setQuestions(parsed.slice(0, 10));
     } catch (err) {
       console.error("[DatabaseTabs] Questions error:", err);
       toast({ title: "Error generating questions", description: String(err), variant: "destructive" });
@@ -995,7 +995,7 @@ function DatabaseTabs({
         .split("\n")
         .map((l) => l.replace(/^\d+[\.\)]\s*/, "").trim())
         .filter((l) => l.length > 10);
-      setQuestions(parsed.slice(0, 5));
+      setQuestions(parsed.slice(0, 10));
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
     } finally {
