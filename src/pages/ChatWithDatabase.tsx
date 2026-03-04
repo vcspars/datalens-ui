@@ -313,8 +313,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
           content:
             "Welcome to DataLens! I can help you with:\n\n" +
             "- Query your database with natural language\n" +
-            "- Explore relationships between tables\n" +
-            "- Generate complex data analysis reports",
+            "- Help you with your questions\n" +
+            "- Generate insights from your data",
           timestamp: new Date(),
         };
 
