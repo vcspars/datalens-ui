@@ -128,17 +128,8 @@ function TableActions({
   const tables = message.tables && message.tables.length > 0 ? message.tables : null;
 
   const handleCopy = () => {
-    console.log("[TableActions] Copying formatted text to clipboard");
-    const plainText = message.content
-      .replace(/#{1,6}\s+/g, "")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/`(.+?)`/g, "$1")
-      .replace(/\|/g, "\t")
-      .replace(/^[-|:\s]+$/gm, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    navigator.clipboard.writeText(plainText).then(() => {
+    console.log("[TableActions] Copying raw markdown to clipboard");
+    navigator.clipboard.writeText(message.content).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -533,7 +524,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   // Render — exact same structure / classNames as Chatbot.tsx
   // -------------------------------------------------------------------------
   return (
-    <div className="flex flex-col h-full w-full bg-chat-bg">
+    <div className="flex flex-col h-full w-full min-w-0 overflow-hidden bg-chat-bg">
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
         <div className="min-w-0 flex-1">
@@ -553,8 +544,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-3 sm:p-4" ref={scrollRef}>
-        <div className="space-y-3 sm:space-y-4 w-full">
+      <ScrollArea className="flex-1 min-h-0 min-w-0 py-3 sm:py-4 pl-3 sm:pl-4 pr-3 sm:pr-4" ref={scrollRef}>
+        <div className="space-y-3 sm:space-y-4 w-full min-w-0">
           {historyLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -563,9 +554,9 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             messages.map((message, idx) => (
               <div
                 key={message.id}
-                className={`group flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`group flex min-w-0 ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div className={`flex items-start gap-2 sm:gap-3 max-w-[85%] ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                <div className={`flex items-start gap-2 sm:gap-3 min-w-0 ${message.role === "user" ? "max-w-full flex-row-reverse" : "max-w-[95%] flex-row"}`}>
                   {/* Avatar */}
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 mt-1">
                     <AvatarFallback className={
@@ -577,7 +568,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                     </AvatarFallback>
                   </Avatar>
 
-                  <div className="flex items-start gap-1 sm:gap-2 flex-1 min-w-0">
+                  <div className="flex items-start gap-1 sm:gap-2 flex-1 min-w-0 overflow-hidden">
                     {/* Bookmark button on user messages */}
                     {message.role === "user" && (
                       <Button
@@ -590,14 +581,14 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                       </Button>
                     )}
 
-                    <div className="flex flex-col">
+                    <div className="flex flex-col min-w-0 max-w-full">
                       <div className={`rounded-lg p-2 sm:p-3 ${
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-background border border-border text-foreground"
+                          ? "bg-primary text-primary-foreground overflow-visible"
+                          : "bg-background border border-border text-foreground overflow-x-auto max-w-full lg:max-w-[700px] xl:max-w-[800px]"
                       }`}>
                         {message.role === "user" ? (
-                          <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                          <p className="text-xs sm:text-sm whitespace-pre-wrap break-words min-w-0">{message.content}</p>
                         ) : (
                           <>
                             {message.content ? (
@@ -1480,7 +1471,7 @@ const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll
         {!tabsFullscreen && (
           <div
             style={chatFullscreen ? { width: "100%" } : { width: `${leftWidth}%` }}
-            className="h-full transition-all duration-300 hidden lg:flex flex-col"
+            className="h-full min-w-0 overflow-hidden transition-all duration-300 hidden lg:flex flex-col"
           >
             <ChatPanel
               isFullscreen={chatFullscreen}

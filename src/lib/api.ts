@@ -1,5 +1,7 @@
 // API service layer for backend communication
 
+import { toast } from "@/hooks/use-toast";
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 // ---------------------------------------------------------------------------
@@ -9,15 +11,26 @@ export const getAuthToken = (): string | null => localStorage.getItem("auth_toke
 export const setAuthToken = (token: string): void => localStorage.setItem("auth_token", token);
 export const removeAuthToken = (): void => localStorage.removeItem("auth_token");
 
+const AUTH_REDIRECT_URL = "http://localhost:8080/auth";
+
 /**
- * Call after fetch(); on 401 removes token and redirects to login.
+ * Call after fetch(); on 401 shows session-expired toast, then removes token and redirects to login.
  * Throw so caller does not continue with expired session.
  */
 function handleAuthError(response: Response): void {
   if (response.status === 401) {
-    removeAuthToken();
     if (typeof window !== "undefined") {
-      window.location.href = "http://localhost:8080/auth";
+      toast({
+        title: "Session expired",
+        description: "Your session has expired. Please log in again.",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        removeAuthToken();
+        window.location.href = AUTH_REDIRECT_URL;
+      }, 1500);
+    } else {
+      removeAuthToken();
     }
     throw new Error("Session expired. Redirecting to login...");
   }
@@ -46,12 +59,28 @@ export const apiRequest = async <T>(
 
   if (!response.ok) {
     if (response.status === 401) {
-      removeAuthToken();
-      // Redirect to external auth app when session is invalid/expired
-      if (typeof window !== "undefined") {
-        window.location.href = "http://localhost:8080/auth";
+      const isAuthEndpoint = endpoint === "/auth/login" || endpoint === "/auth/signup";
+      if (!isAuthEndpoint && typeof window !== "undefined") {
+        toast({
+          title: "Session expired",
+          description: "Your session has expired. Please log in again.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          removeAuthToken();
+          window.location.href = AUTH_REDIRECT_URL;
+        }, 1500);
+      } else if (!isAuthEndpoint) {
+        removeAuthToken();
       }
-      throw new Error("Authentication failed. Please login again.");
+      let message = "Authentication failed. Please login again.";
+      try {
+        const errBody = await response.json();
+        message = errBody.detail || message;
+      } catch {
+        if (isAuthEndpoint) message = "Invalid email or password.";
+      }
+      throw new Error(message);
     }
     let error: { detail?: string };
     try {
