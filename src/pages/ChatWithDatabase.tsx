@@ -302,7 +302,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
           id: "welcome",
           role: "assistant",
           content:
-            "Welcome to SPARSlens! I can help you with:\n\n" +
+            "Welcome to SPARS lens! I can help you with:\n\n" +
             "- Query your database with natural language\n" +
             "- Help you with your questions\n" +
             "- Generate insights from your data",
@@ -530,7 +530,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         <div className="min-w-0 flex-1">
           <h2 className="text-base sm:text-lg font-semibold text-foreground truncate">Chat Assistant</h2>
           <p className="text-xs sm:text-sm text-muted-foreground truncate">
-            Ask questions about your database
+            Talk to your database in natural language. 
           </p>
         </div>
         <Button

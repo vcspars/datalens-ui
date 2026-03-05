@@ -124,13 +124,13 @@ export function renderChart(
       );
     case "pie":
       return (
-        <PieChart margin={{ top: 40, right: 16, bottom: 32, left: 16 }}>
+        <PieChart margin={{ top: 40, right: 100, bottom: 32, left: 185 }}>
           <Pie
             data={data}
             dataKey={yKey}
             nameKey={xKey}
-            cx="50%"
-            cy="55%"
+            cx="0%"
+            cy="49%"
             outerRadius={80}
             label
           >
@@ -139,7 +139,18 @@ export function renderChart(
             ))}
           </Pie>
           <Tooltip />
-          <Legend wrapperStyle={{ marginTop: 20 }} formatter={legendFormatter} />
+          <Legend
+            layout="vertical"
+            align="right"
+            verticalAlign="middle"
+            wrapperStyle={{
+              paddingLeft: -10,
+              maxHeight: 220,
+              overflowY: "auto",
+              overflowX: "hidden",
+            }}
+            formatter={legendFormatter}
+          />
         </PieChart>
       );
     case "scatter":
