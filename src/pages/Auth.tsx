@@ -68,17 +68,14 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-light to-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center h-16 w-16 bg-primary rounded-2xl mb-4">
-            <span className="text-primary-foreground font-bold text-2xl">DL</span>
-          </div>
-          <h1 className="text-3xl font-bold text-foreground">DataLens</h1>
-          <p className="text-muted-foreground mt-2">
+        <div className="text-center mb-4 flex flex-col items-center gap-0 leading-none">
+          <img src="/9.png" alt="SPARS lens" className="h-[288px] w-auto object-contain object-bottom block -mb-20" />
+          <p className="text-muted-foreground leading-tight m-0">
             Analyze your data with AI-powered insights
           </p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs defaultValue="login" className="w-full -mt-2">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>

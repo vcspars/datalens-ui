@@ -20,14 +20,11 @@ export default function LandingHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between p-4 lg:px-8" aria-label="Global">
-        <div className="flex lg:flex-1">
-          <Link to="/" className="-m-1.5 p-1.5 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">DW</span>
-            </div>
-            <span className="text-xl font-bold">Data Whisperer</span>
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 overflow-visible">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 h-16 overflow-visible lg:px-8" aria-label="Global">
+        <div className="flex lg:flex-1 items-center">
+          <Link to="/" className="-m-1.5 p-1.5 flex items-center shrink-0 -my-1" aria-label="SPARS lens home">
+            <img src="/9.png" alt="SPARS lens" className="h-[168px] w-auto object-contain block" />
           </Link>
         </div>
         
@@ -89,11 +86,8 @@ export default function LandingHeader() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
               <div className="flex flex-col gap-4">
-                <Link to="/" className="-m-1.5 p-1.5 flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                    <span className="text-primary-foreground font-bold text-lg">DW</span>
-                  </div>
-                  <span className="text-xl font-bold">Data Whisperer</span>
+                <Link to="/" className="-m-1.5 p-1.5 flex items-center" aria-label="SPARS lens home" onClick={() => setMobileMenuOpen(false)}>
+                  <img src="/9.png" alt="SPARS lens" className="h-[168px] w-auto object-contain" />
                 </Link>
                 
                 <div className="flex flex-col gap-2 mt-4">

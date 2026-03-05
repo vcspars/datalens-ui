@@ -302,7 +302,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
           id: "welcome",
           role: "assistant",
           content:
-            "Welcome to DataLens! I can help you with:\n\n" +
+            "Welcome to SPARSlens! I can help you with:\n\n" +
             "- Query your database with natural language\n" +
             "- Help you with your questions\n" +
             "- Generate insights from your data",
@@ -331,7 +331,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
           id: "welcome",
           role: "assistant",
           content:
-            "Welcome to DataLens! I can help you with:\n\n" +
+            "Welcome to SPARSlens! I can help you with:\n\n" +
             "- Query your database with natural language\n" +
             "- Explore relationships between tables\n" +
             "- Generate complex data analysis reports",

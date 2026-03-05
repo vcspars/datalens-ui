@@ -12,7 +12,7 @@ export default function Help() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Help Center</h1>
           <p className="text-muted-foreground">
-            Learn how to make the most of DataLens
+            Learn how to make the most of SPARSlens
           </p>
         </div>
 
@@ -20,11 +20,11 @@ export default function Help() {
           <Card>
             <CardHeader>
               <CardTitle>Getting Started</CardTitle>
-              <CardDescription>Quick guide to using DataLens</CardDescription>
+              <CardDescription>Quick guide to using SPARSlens</CardDescription>
             </CardHeader>
             <CardContent className="prose prose-sm max-w-none">
               <p>
-                DataLens helps you analyze and visualize your data through natural conversation.
+                SPARSlens helps you analyze and visualize your data through natural conversation.
                 Connect your data sources (PDFs, CSV files, or databases) and start asking questions.
               </p>
             </CardContent>
@@ -104,14 +104,14 @@ export default function Help() {
                   <AccordionTrigger>How do I connect a database?</AccordionTrigger>
                   <AccordionContent>
                     Click on "My Datasets" in the header, then select "Connect New Dataset".
-                    Choose "Database" and enter your connection details. DataLens supports
+                    Choose "Database" and enter your connection details. SPARSlens supports
                     PostgreSQL, MySQL, and SQLite databases.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="item-2">
                   <AccordionTrigger>What file formats are supported?</AccordionTrigger>
                   <AccordionContent>
-                    DataLens supports PDF files for document analysis, and CSV/Excel files
+                    SPARSlens supports PDF files for document analysis, and CSV/Excel files
                     for structured data analysis. Maximum file size is 50MB.
                   </AccordionContent>
                 </AccordionItem>
@@ -134,7 +134,7 @@ export default function Help() {
                   <AccordionTrigger>How does voice input work?</AccordionTrigger>
                   <AccordionContent>
                     Click the microphone icon in the chat interface to start voice recording.
-                    Speak your question, and DataLens will transcribe and process it automatically.
+                    Speak your question, and SPARSlens will transcribe and process it automatically.
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>

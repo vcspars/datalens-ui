@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Database, LayoutDashboard, HelpCircle, LogOut, Sun, Moon, ChevronDown, User, MessageSquare } from "lucide-react";
+import { LayoutDashboard, HelpCircle, LogOut, Sun, Moon, ChevronDown, User, MessageSquare } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,14 +50,17 @@ export default function Header() {
       .slice(0, 2);
 
   return (
-    <header className="h-16 bg-background border-b border-border flex items-center px-4 sm:px-6 sticky top-0 z-50">
-      {/* Logo */}
-      <div className="flex items-center gap-2">
-        <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-          <Database className="h-4 w-4 text-primary-foreground" />
-        </div>
-        <h1 className="text-lg sm:text-xl font-semibold text-foreground">SPARSLens</h1>
-      </div>
+    <header className="h-16 flex items-center overflow-visible px-4 sm:px-6 bg-background border-b border-border sticky top-0 z-50">
+      {/* Logo - larger than header so it’s prominent; overflows with overflow-visible */}
+      <button
+        type="button"
+        onClick={() => navigate("/chat")}
+        className="flex items-center rounded-md hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shrink-0 -my-1"
+        aria-label="SPARS lens home"
+      >
+        <img src="/9.png" alt="SPARS lens" className="h-[168px] w-auto object-contain block" />
+        <span className="sr-only">SPARS lens</span>
+      </button>
 
       {/* Nav */}
       <nav className="flex items-center gap-1 sm:gap-2 ml-4 sm:ml-8">
