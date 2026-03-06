@@ -20,7 +20,7 @@ import SaveNameModal from "@/components/SaveNameModal";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -559,13 +559,16 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 <div className={`flex items-start gap-2 sm:gap-3 min-w-0 ${message.role === "user" ? "max-w-full flex-row-reverse" : "max-w-[95%] flex-row"}`}>
                   {/* Avatar */}
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 mt-1">
-                    <AvatarFallback className={
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground"
-                    }>
-                      {message.role === "user" ? <User className="h-3 w-3 sm:h-4 sm:w-4" /> : "D"}
-                    </AvatarFallback>
+                    {message.role === "user" ? (
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </AvatarFallback>
+                    ) : (
+                      <>
+                        <AvatarImage src="/Lens.png" alt="SPARSlens" className="object-contain bg-background" />
+                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">D</AvatarFallback>
+                      </>
+                    )}
                   </Avatar>
 
                   <div className="flex items-start gap-1 sm:gap-2 flex-1 min-w-0 overflow-hidden">
@@ -581,11 +584,11 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                       </Button>
                     )}
 
-                    <div className="flex flex-col min-w-0 max-w-full">
-                      <div className={`rounded-lg p-2 sm:p-3 ${
+                    <div className="flex flex-col min-w-0 max-w-full w-full">
+                      <div className={`rounded-lg p-2 sm:p-3 min-w-0 ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground overflow-visible"
-                          : "bg-background border border-border text-foreground overflow-x-auto max-w-full lg:max-w-[700px] xl:max-w-[800px]"
+                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible max-w-full w-full lg:max-w-[200px] xl:max-w-[500px]"
                       }`}>
                         {message.role === "user" ? (
                           <p className="text-xs sm:text-sm whitespace-pre-wrap break-words min-w-0">{message.content}</p>
@@ -1308,7 +1311,7 @@ function DatabaseTabs({
 // Main page — exact same container / resizing logic as Dashboard.tsx
 // ---------------------------------------------------------------------------
 export default function ChatWithDatabase() {
-  const [leftWidth, setLeftWidth] = useState(40);
+  const [leftWidth, setLeftWidth] = useState(45);
   const [chatFullscreen, setChatFullscreen] = useState(false);
   const [tabsFullscreen, setTabsFullscreen] = useState(false);
   const [graphInstances, setGraphInstances] = useState<GraphInstance[]>([]);
