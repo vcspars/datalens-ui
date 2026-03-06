@@ -283,6 +283,72 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const lastUserPromptRef = useRef<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const inputAtVoiceStartRef = useRef("");
+
+  // Voice input: Web Speech API (built-in, no LLM)
+  const startVoiceInput = useCallback(() => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      toast({ title: "Not supported", description: "Voice input is not supported in this browser. Try Chrome or Edge.", variant: "destructive" });
+      return;
+    }
+    if (isLoading) return;
+    if (!recognitionRef.current) {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.onresult = (e: SpeechRecognitionEvent) => {
+        const results = e.results;
+        let transcript = "";
+        for (let i = 0; i < results.length; i++) {
+          transcript += results.item(i).item(0).transcript;
+        }
+        const base = inputAtVoiceStartRef.current;
+        setInput((base ? `${base} ${transcript}` : transcript).trim());
+      };
+      recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+        if (e.error !== "aborted") {
+          setIsRecording(false);
+          toast({ title: "Voice input error", description: e.error === "not-allowed" ? "Microphone access denied." : "Could not start voice input.", variant: "destructive" });
+        }
+      };
+      recognition.onend = () => setIsRecording(false);
+      recognitionRef.current = recognition;
+    }
+    try {
+      inputAtVoiceStartRef.current = input;
+      recognitionRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      setIsRecording(false);
+      toast({ title: "Voice input failed", description: "Could not start microphone.", variant: "destructive" });
+    }
+  }, [isLoading, toast]);
+
+  const stopVoiceInput = useCallback(() => {
+    if (recognitionRef.current && isRecording) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      setIsRecording(false);
+    }
+  }, [isRecording]);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, []);
 
   // Auto-scroll to the latest message (anchor at the start of the last message)
   useEffect(() => {
@@ -691,13 +757,16 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
               </Button>
             </div>
             <Button
-              onClick={() => setIsRecording(r => !r)}
+              onClick={() => (isRecording ? stopVoiceInput() : startVoiceInput())}
               variant={isRecording ? "destructive" : "outline"}
               size="icon"
-              className="h-full w-full"
+              className={`h-full w-full relative ${isRecording ? "animate-pulse" : ""}`}
             >
+              {isRecording && (
+                <span className="absolute inset-0 rounded-md bg-destructive/40 animate-ping" aria-hidden />
+              )}
               {isRecording
-                ? <MicOff className="h-3 w-3 sm:h-4 sm:w-4" />
+                ? <Mic className="h-3 w-3 sm:h-4 sm:w-4 relative z-10" />
                 : <Mic className="h-3 w-3 sm:h-4 sm:w-4" />
               }
             </Button>
