@@ -588,7 +588,9 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                       <div className={`rounded-lg p-2 sm:p-3 min-w-0 ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground overflow-visible"
-                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible max-w-full w-full lg:max-w-[200px] xl:max-w-[500px]"
+                          : isFullscreen
+                            ? "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible max-w-full w-full max-w-[1300px]"
+                            : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible max-w-full w-full lg:max-w-[350px] xl:max-w-[500px]"
                       }`}>
                         {message.role === "user" ? (
                           <p className="text-xs sm:text-sm whitespace-pre-wrap break-words min-w-0">{message.content}</p>
