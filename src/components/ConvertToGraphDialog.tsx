@@ -13,12 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  detectColumnMeta,
-  getAvailableGraphTypes,
-  type GraphType,
-  type ColumnMeta,
-} from "@/lib/chartUtils";
+import { detectColumnMeta, type GraphType, type ColumnMeta } from "@/lib/chartUtils";
+
+/** All chart types available in Convert to Graph — show every option. */
+const ALL_GRAPH_TYPES: GraphType[] = ["bar", "line", "pie", "area", "scatter"];
 import { BarChart2, TrendingUp, PieChart as PieIcon, Activity, Circle } from "lucide-react";
 
 const GRAPH_ICONS: Record<GraphType, React.ReactNode> = {
@@ -77,20 +75,10 @@ export default function ConvertToGraphDialog({
   const { data: tableData, columns: tableColumns } = getTableData(message, tableIndex);
 
   const colMeta: ColumnMeta[] = detectColumnMeta(tableData, tableColumns);
-  const availableTypes = getAvailableGraphTypes(colMeta);
   const numericCols = colMeta.filter((c) => c.isNumeric).map((c) => c.name);
   const categoryCols = colMeta.filter((c) => c.isCategorical).map((c) => c.name);
+  /** Show all column names for X and Y (no sanitization/filtering). */
   const allCols = tableColumns;
-
-  const getValidXCols = () => {
-    if (graphType === "pie") return categoryCols.length > 0 ? categoryCols : allCols;
-    if (graphType === "scatter") return numericCols.length > 0 ? numericCols : allCols;
-    return allCols;
-  };
-
-  const getValidYCols = () => {
-    return numericCols.length > 0 ? numericCols : allCols;
-  };
 
   // Reset table selection when dialog opens
   useEffect(() => {
@@ -100,21 +88,15 @@ export default function ConvertToGraphDialog({
   // Reset / derive state when dialog opens or table selection changes
   useEffect(() => {
     if (!open || !tableColumns.length) return;
-    const types = getAvailableGraphTypes(colMeta);
-    const gType = (types.includes(graphType) ? graphType : types[0]) as GraphType;
-    setGraphType(gType);
-    const catCols = colMeta.filter((c) => c.isCategorical).map((c) => c.name);
-    const numCols = colMeta.filter((c) => c.isNumeric).map((c) => c.name);
-    setXKey(catCols[0] || allCols[0] || "");
-    setYKey(numCols[0] || allCols[1] || "");
+    setGraphType((prev) => (ALL_GRAPH_TYPES.includes(prev) ? prev : "bar"));
+    setXKey((prev) => (allCols.includes(prev) ? prev : categoryCols[0] || allCols[0] || ""));
+    setYKey((prev) => (allCols.includes(prev) ? prev : numericCols[0] || allCols[1] || allCols[0] || ""));
   }, [open, tableIndex, tableColumns.join(",")]);
 
-  // When graph type changes, adjust axes to valid values
+  // When graph type changes, keep current selection if still in allCols
   useEffect(() => {
-    const xCols = getValidXCols();
-    const yCols = getValidYCols();
-    if (xCols.length && !xCols.includes(xKey)) setXKey(xCols[0]);
-    if (yCols.length && !yCols.includes(yKey)) setYKey(yCols[0]);
+    if (allCols.length && !allCols.includes(xKey)) setXKey(allCols[0]);
+    if (allCols.length && !allCols.includes(yKey)) setYKey(allCols[allCols.length > 1 ? 1 : 0]);
   }, [graphType]);
 
   const handleConfirm = () => {
@@ -157,7 +139,7 @@ export default function ConvertToGraphDialog({
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Chart type</Label>
                 <div className="flex gap-2 flex-wrap">
-                  {availableTypes.map((type) => (
+                  {ALL_GRAPH_TYPES.map((type) => (
                     <Button
                       key={type}
                       size="sm"
@@ -182,7 +164,7 @@ export default function ConvertToGraphDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {getValidXCols().map((col) => (
+                      {allCols.map((col) => (
                         <SelectItem key={col} value={col} className="text-xs">{col}</SelectItem>
                       ))}
                     </SelectContent>
@@ -197,7 +179,7 @@ export default function ConvertToGraphDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {getValidYCols().map((col) => (
+                      {allCols.map((col) => (
                         <SelectItem key={col} value={col} className="text-xs">{col}</SelectItem>
                       ))}
                     </SelectContent>

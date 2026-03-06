@@ -26,6 +26,60 @@ const legendFormatter = (value: string) => (
   <span style={{ fontSize: 10 }}>{value}</span>
 );
 
+/** Custom legend content: 12 items per column, then new column to the right. Used only for export modal. */
+function MultiColumnLegendContent({
+  payload = [],
+  formatter,
+  columns = 12,
+}: {
+  payload?: Array<{ value?: string; color?: string; inactive?: boolean; type?: string }>;
+  formatter?: (value: string, entry: unknown, index: number) => React.ReactNode;
+  columns?: number;
+}) {
+  if (!payload.length) return null;
+  return (
+    <ul
+      className="recharts-default-legend"
+      style={{
+        display: "grid",
+        gridAutoFlow: "column",
+        gridTemplateRows: `repeat(${columns}, auto)`,
+        gap: "2px 12px",
+        listStyle: "none",
+        padding: 0,
+        margin: 0,
+        textAlign: "left",
+      }}
+    >
+      {payload.map((entry, i) => {
+        if ((entry as { type?: string }).type === "none") return null;
+        const value = typeof entry.value !== "function" ? entry.value : "";
+        const color = entry.inactive ? "#ccc" : entry.color;
+        return (
+          <li
+            key={`legend-item-${i}`}
+            className="recharts-legend-item"
+            style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 0 }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                flexShrink: 0,
+                backgroundColor: color,
+                borderRadius: 2,
+              }}
+            />
+            <span className="recharts-legend-item-text" style={{ color, fontSize: 10 }}>
+              {formatter ? formatter(String(value ?? ""), entry, i) : value}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** Strip $, commas, currency symbols before parsing so values like $10,000 or 10,000 parse correctly. */
 function parseNumericValue(raw: string): number {
   if (!raw || typeof raw !== "string") return NaN;
@@ -76,12 +130,20 @@ export function prepareChartData(
   }));
 }
 
+export interface RenderChartOptions {
+  /** When true, legend does not use scroll (e.g. for export so scrollbar is not captured). */
+  noLegendScroll?: boolean;
+  /** When set (e.g. 12), legend items are laid out in columns with this many rows per column; overflow goes to columns to the right. */
+  legendColumns?: number;
+}
+
 export function renderChart(
   type: GraphType,
   data: Record<string, unknown>[],
   xKey: string,
   yKey: string,
-  colors: string[] = CHART_COLORS
+  colors: string[] = CHART_COLORS,
+  options?: RenderChartOptions
 ): React.ReactNode {
   const commonProps = {
     data,
@@ -124,12 +186,12 @@ export function renderChart(
       );
     case "pie":
       return (
-        <PieChart margin={{ top: 40, right: 100, bottom: 32, left: 185 }}>
+        <PieChart margin={{ top: 40, right: 80, bottom: 32, left: 24 }}>
           <Pie
             data={data}
             dataKey={yKey}
             nameKey={xKey}
-            cx="0%"
+            cx="43%"
             cy="49%"
             outerRadius={80}
             label
@@ -143,11 +205,17 @@ export function renderChart(
             layout="vertical"
             align="right"
             verticalAlign="middle"
+            content={
+              options?.legendColumns ? (
+                <MultiColumnLegendContent columns={options.legendColumns} />
+              ) : undefined
+            }
             wrapperStyle={{
               paddingLeft: -10,
-              maxHeight: 220,
-              overflowY: "auto",
-              overflowX: "hidden",
+              marginLeft: 18,
+              ...(options?.noLegendScroll
+                ? { maxHeight: "none", overflow: "visible" }
+                : { maxHeight: 220, overflowY: "auto", overflowX: "hidden" }),
             }}
             formatter={legendFormatter}
           />

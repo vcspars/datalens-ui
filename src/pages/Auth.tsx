@@ -66,29 +66,33 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-light to-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-4 flex flex-col items-center gap-0 leading-none">
-          <img src="/9.png" alt="SPARS lens" className="h-[288px] w-auto object-contain object-bottom block -mb-20" />
-          <p className="text-muted-foreground leading-tight m-0">
+    <div className="min-h-screen bg-gradient-to-br from-primary-light to-background flex items-start justify-center p-3 pt-4 sm:p-4 sm:pt-8 pb-8 overflow-y-auto">
+      <div className="w-full max-w-md min-w-0">
+        <div className="text-center mb-3 sm:mb-4 flex flex-col items-center gap-0 leading-none">
+          <img
+            src="/9.png"
+            alt="SPARS lens"
+            className="h-[140px] sm:h-[200px] md:h-[260px] lg:h-[288px] w-auto max-w-full object-contain object-bottom block -mb-10 sm:-mb-16 md:-mb-20"
+          />
+          <p className="text-muted-foreground text-xs sm:text-sm leading-tight m-0 px-1">
             Analyze your data with AI-powered insights
           </p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full -mt-2">
+        <Tabs defaultValue="login" className="w-full -mt-1 sm:-mt-2">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
-            <Card>
-              <CardHeader>
-                <CardTitle>Welcome back</CardTitle>
-                <CardDescription>Enter your credentials to access your account</CardDescription>
+            <Card className="overflow-hidden">
+              <CardHeader className="px-3 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
+                <CardTitle className="text-lg sm:text-xl">Welcome back</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Enter your credentials to access your account</CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
+              <CardContent className="px-3 pb-4 sm:px-6 sm:pb-6">
+                <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
                     <Input
@@ -130,13 +134,13 @@ export default function Auth() {
           </TabsContent>
 
           <TabsContent value="signup">
-            <Card>
-              <CardHeader>
-                <CardTitle>Create an account</CardTitle>
-                <CardDescription>Enter your information to get started</CardDescription>
+            <Card className="overflow-hidden">
+              <CardHeader className="px-3 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
+                <CardTitle className="text-lg sm:text-xl">Create an account</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Enter your information to get started</CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSignup} className="space-y-4">
+              <CardContent className="px-3 pb-4 sm:px-6 sm:pb-6">
+                <form onSubmit={handleSignup} className="space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-name">Full Name</Label>
                     <Input
@@ -209,6 +213,10 @@ export default function Auth() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <p className="text-center text-xs sm:text-sm text-muted-foreground mt-4 sm:mt-6">
+          Powered by <span className="text-primary font-medium">SPARS</span>
+        </p>
       </div>
     </div>
   );

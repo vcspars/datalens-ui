@@ -260,7 +260,7 @@ export default function GraphPreview({
       {/* Chart — explicit pixel height ensures html-to-image captures non-blank output */}
       <div ref={chartRef} className="bg-white border border-border rounded-lg p-3 flex-1" style={{ minHeight: 300 }}>
         <ResponsiveContainer width="100%" height={300}>
-          {renderChart(graphType, chartData, xKey, yKey) as React.ReactElement}
+          {renderChart(graphType, chartData, xKey, yKey, CHART_COLORS, { noLegendScroll: true, legendColumns: 12 }) as React.ReactElement}
         </ResponsiveContainer>
       </div>
 

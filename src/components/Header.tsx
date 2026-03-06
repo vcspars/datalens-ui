@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, HelpCircle, LogOut, Sun, Moon, ChevronDown, User, MessageSquare } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,9 @@ import { getCurrentUser, logout, UserResponse } from "@/lib/api";
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, setTheme } = useTheme();
+  const pathname = location.pathname;
   const [user, setUser] = useState<UserResponse | null>(null);
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export default function Header() {
       <nav className="flex items-center gap-1 sm:gap-2 ml-4 sm:ml-8">
         <Button
           variant="ghost"
-          className="gap-2 text-sm sm:text-base px-2 sm:px-4"
+          className={`gap-2 text-sm sm:text-base px-2 sm:px-4 ${pathname === "/chat" ? "text-primary" : ""}`}
           onClick={() => {
             console.log("[Header] Navigate to /chat");
             navigate("/chat");
@@ -78,7 +80,7 @@ export default function Header() {
 
         <Button
           variant="ghost"
-          className="gap-2 text-sm sm:text-base px-2 sm:px-4"
+          className={`gap-2 text-sm sm:text-base px-2 sm:px-4 ${pathname === "/my-dashboard" ? "text-primary" : ""}`}
           onClick={() => {
             console.log("[Header] Navigate to /my-dashboard");
             navigate("/my-dashboard");
@@ -90,7 +92,7 @@ export default function Header() {
 
         <Button
           variant="ghost"
-          className="gap-2 text-sm sm:text-base px-2 sm:px-4"
+          className={`gap-2 text-sm sm:text-base px-2 sm:px-4 ${pathname === "/help" ? "text-primary" : ""}`}
           onClick={() => navigate("/help")}
         >
           <HelpCircle className="h-4 w-4" />
@@ -137,7 +139,7 @@ export default function Header() {
         ) : (
           <Button
             variant="ghost"
-            className="gap-2 text-sm sm:text-base px-2 sm:px-4"
+            className={`gap-2 text-sm sm:text-base px-2 sm:px-4 ${pathname === "/auth" ? "text-primary" : ""}`}
             onClick={() => navigate("/auth")}
           >
             <User className="h-4 w-4" />

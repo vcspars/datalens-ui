@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Header from "@/components/Header";
 import MarkdownMessage from "@/components/MarkdownMessage";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import GenerateReportDialog from "@/components/GenerateReportDialog";
 import { renderChart, CHART_COLORS, type GraphType } from "@/lib/chartUtils";
 import {
-  BarChart3, Table2, FileText, Trash2, Eye, Download, Loader2, RefreshCw, Info, Maximize2,
+  BarChart3, Table2, FileText, Trash2, Eye, Download, Loader2, RefreshCw, Info, Maximize2, FileDown,
 } from "lucide-react";
 import { ResponsiveContainer } from "recharts";
+import { toPng, toSvg, toJpeg } from "html-to-image";
+import * as XLSX from "xlsx";
 import {
   getDashboardItems,
   getDashboardReports,
@@ -106,6 +108,8 @@ export default function MyDashboard() {
   const [viewReport, setViewReport] = useState<DashboardItemOut | null>(null);
   const [metaItem, setMetaItem] = useState<DashboardItemOut | null>(null);
   const [previewItem, setPreviewItem] = useState<DashboardItemOut | null>(null);
+  const [exportItem, setExportItem] = useState<DashboardItemOut | null>(null);
+  const exportChartRef = useRef<HTMLDivElement>(null);
 
   const [itemTypeFilter, setItemTypeFilter] = useState<"all" | "table" | "graph">("all");
   const [graphTypeFilter, setGraphTypeFilter] = useState<string>("all");
@@ -248,6 +252,66 @@ export default function MyDashboard() {
     return items.filter((i) => rawIds.includes(i.id));
   };
 
+  // --- Export helpers ---
+  const downloadTableAsCsv = (item: DashboardItemOut) => {
+    const cols = item.table_columns ?? [];
+    const rows = (item.table_data ?? []) as Record<string, unknown>[];
+    const escape = (v: unknown) => {
+      const s = String(v ?? "");
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const header = cols.map(escape).join(",");
+    const body = rows.map((r) => cols.map((c) => escape(r[c])).join(",")).join("\r\n");
+    const csv = `${header}\r\n${body}`;
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(item.name || "table").replace(/[^a-zA-Z0-9_-]/g, "_")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadTableAsExcel = (item: DashboardItemOut) => {
+    const cols = item.table_columns ?? [];
+    const rows = (item.table_data ?? []) as Record<string, unknown>[];
+    const sheetData: unknown[][] = [cols];
+    rows.forEach((r) => sheetData.push(cols.map((c) => r[c] ?? "")));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(item.name || "table").replace(/[^a-zA-Z0-9_-]/g, "_")}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadGraphAs = async (format: "png" | "svg" | "jpeg") => {
+    const el = exportChartRef.current;
+    if (!el || !exportItem || exportItem.item_type !== "graph") return;
+    try {
+      const opts = { cacheBust: true, pixelRatio: 2 };
+      let dataUrl: string;
+      if (format === "png") dataUrl = await toPng(el, opts);
+      else if (format === "jpeg") dataUrl = await toJpeg(el, { ...opts, quality: 0.95 });
+      else dataUrl = await toSvg(el, opts);
+      const ext = format === "jpeg" ? "jpg" : format;
+      const link = document.createElement("a");
+      link.download = `${(exportItem.name || "chart").replace(/[^a-zA-Z0-9_-]/g, "_")}.${ext}`;
+      link.href = dataUrl;
+      link.click();
+      toast({ title: "Downloaded", description: `Chart saved as ${ext.toUpperCase()}` });
+    } catch (err) {
+      console.error("[MyDashboard] Graph export error:", err);
+      toast({ title: "Export failed", description: "Could not export chart.", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -387,6 +451,15 @@ export default function MyDashboard() {
                           >
                             <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 rounded-full bg-background/80 backdrop-blur border border-border shadow-sm flex items-center justify-center"
+                            onClick={() => setExportItem(item)}
+                            aria-label="Export"
+                          >
+                            <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
                         </div>
                       </div>
                     </CardHeader>
@@ -497,7 +570,7 @@ export default function MyDashboard() {
                           }}
                         >
                           <Eye className="h-4 w-4" />
-                          View Report
+                          Preview
                         </Button>
                         <Button
                           variant="outline"
@@ -520,7 +593,7 @@ export default function MyDashboard() {
                           }}
                         >
                           <Download className="h-4 w-4" />
-                          Download
+                          Download PDF
                         </Button>
                         <Button
                           variant="ghost"
@@ -611,7 +684,8 @@ export default function MyDashboard() {
                     (previewItem.graph_config.data as Record<string, unknown>[]) || [],
                     (previewItem.graph_config.xKey as string) || "",
                     (previewItem.graph_config.yKey as string) || "",
-                    (previewItem.graph_config.colors as string[]) || CHART_COLORS
+                    (previewItem.graph_config.colors as string[]) || CHART_COLORS,
+                    { noLegendScroll: true, legendColumns: 12 }
                   ) as React.ReactElement}
                 </ResponsiveContainer>
               </div>
@@ -677,6 +751,84 @@ export default function MyDashboard() {
           </div>
           <DialogFooter className="mt-3">
             <Button variant="outline" onClick={() => setMetaItem(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export modal: table → CSV/Excel; graph → PNG/SVG/JPG */}
+      <Dialog open={!!exportItem} onOpenChange={(v) => !v && setExportItem(null)}>
+        <DialogContent className="sm:max-w-4xl w-[95vw]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="h-4 w-4 text-primary" />
+              Export {exportItem?.name ?? ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {exportItem?.item_type === "table" && (
+              <>
+                <p className="text-sm text-muted-foreground">Choose format to export the table.</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      downloadTableAsCsv(exportItem);
+                      setExportItem(null);
+                    }}
+                  >
+                    CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      downloadTableAsExcel(exportItem);
+                      setExportItem(null);
+                    }}
+                  >
+                    Excel
+                  </Button>
+                </div>
+              </>
+            )}
+            {exportItem?.item_type === "graph" && exportItem.graph_config && exportItem.graph_type && (
+              <>
+                <p className="text-sm text-muted-foreground">Choose image format to download the chart.</p>
+                <div
+                  ref={exportChartRef}
+                  className="w-full min-w-[600px] h-[420px] rounded-lg bg-muted border shrink-0 overflow-hidden"
+                  aria-hidden
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    {renderChart(
+                      exportItem.graph_type as GraphType,
+                      (exportItem.graph_config.data as Record<string, unknown>[]) || [],
+                      (exportItem.graph_config.xKey as string) || "",
+                      (exportItem.graph_config.yKey as string) || "",
+                      (exportItem.graph_config.colors as string[]) || CHART_COLORS,
+                      { noLegendScroll: true, legendColumns: 12 }
+                    ) as React.ReactElement}
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => downloadGraphAs("png")}>
+                    PNG
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={() => downloadGraphAs("svg")}>
+                    SVG
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={() => downloadGraphAs("jpeg")}>
+                    JPG
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter className="mt-3">
+            <Button variant="outline" onClick={() => setExportItem(null)}>
               Close
             </Button>
           </DialogFooter>
