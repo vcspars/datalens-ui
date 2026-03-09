@@ -101,7 +101,7 @@ export default function Help() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-
+      
       <div className="flex max-w-6xl mx-auto">
         {/* Left: sticky sidebar */}
         <aside className="hidden lg:block w-64 flex-shrink-0 border-r border-border bg-background/95">
@@ -341,8 +341,8 @@ export default function Help() {
                 "Click the microphone icon in the chat, speak your question clearly, and the system will transcribe it and run it as a question. Useful when you prefer speaking instead of typing.",
                 search
               )}
-            </p>
-          </div>
+                    </p>
+                  </div>
         </main>
       </div>
     </div>
