@@ -4,17 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import LandingHeader from "@/components/LandingHeader";
 import LandingFooter from "@/components/LandingFooter";
 import { 
-  FileText, 
-  Database, 
-  BarChart3, 
-  Sparkles, 
-  Zap, 
-  Shield, 
+  Database,
+  BarChart3,
+  Sparkles,
   CheckCircle2,
   ArrowRight,
   TrendingUp,
-  Users,
-  Globe
 } from "lucide-react";
 import { getAuthToken } from "@/lib/api";
 
@@ -24,57 +19,57 @@ export default function Homepage() {
 
   const features = [
     {
-      icon: FileText,
-      title: "PDF Analysis",
-      description: "Upload and analyze PDF documents with AI-powered text extraction, summarization, and intelligent Q&A.",
+      icon: Database,
+      title: "Chat with Your Database",
+      description: "Ask questions in plain English and get accurate answers, tables, and SQL generated from your database.",
     },
     {
-      icon: Database,
-      title: "CSV/Excel Processing",
-      description: "Process and analyze spreadsheet data with advanced calculations, filtering, and data manipulation tools.",
+      icon: Sparkles,
+      title: "AI SQL Assistance",
+      description: "Generate, inspect, and reuse SQL confidently with AI-assisted reasoning and context from your schema.",
     },
     {
       icon: BarChart3,
       title: "Data Visualization",
-      description: "Create beautiful charts and graphs to visualize your data insights and trends.",
+      description: "Turn query results into charts and dashboards for quick understanding and sharing.",
+    },
+    {
+      icon: TrendingUp,
+      title: "Operational Insights",
+      description: "Identify trends, anomalies, and key KPIs from your live database with actionable summaries.",
+    },
+    {
+      icon: Database,
+      title: "Saved Views & Dashboards",
+      description: "Save useful tables, charts, and reports to your dashboard for reuse and team workflows.",
     },
     {
       icon: Sparkles,
-      title: "AI-Powered Insights",
-      description: "Generate summaries, questions, and reports automatically using advanced AI technology.",
-    },
-    {
-      icon: Zap,
-      title: "Fast Processing",
-      description: "Lightning-fast data processing and analysis with optimized performance for large datasets.",
-    },
-    {
-      icon: Shield,
-      title: "Secure & Private",
-      description: "Your data is encrypted and stored securely. We never share your information with third parties.",
+      title: "Reports & Summaries",
+      description: "Generate clear summaries from query results to share with stakeholders quickly.",
     },
   ];
 
   const stats = [
-    { value: "500M+", label: "Documents Processed" },
-    { value: "25M+", label: "Monthly Operations" },
-    { value: "300k+", label: "Active Users" },
+    { value: "Faster", label: "Decision-ready insights" },
+    { value: "Audit-ready", label: "SQL you can review & trust" },
+    { value: "Secure", label: "Designed for enterprise governance" },
   ];
 
   const useCases = [
     {
-      title: "Financial Analysis",
-      description: "Analyze financial reports, invoices, and spreadsheets with AI-powered insights.",
+      title: "Analytics & BI",
+      description: "Explore tables, validate metrics, and quickly answer business questions with generated SQL.",
       icon: TrendingUp,
     },
     {
-      title: "Data Research",
-      description: "Extract insights from research papers, documents, and datasets.",
-      icon: FileText,
+      title: "Operations",
+      description: "Investigate anomalies, monitor KPIs, and turn raw data into daily decisions.",
+      icon: Database,
     },
     {
-      title: "Business Intelligence",
-      description: "Transform raw data into actionable business insights and reports.",
+      title: "Reporting",
+      description: "Generate shareable tables, charts, and summaries from your database in minutes.",
       icon: BarChart3,
     },
   ];
@@ -92,8 +87,7 @@ export default function Homepage() {
               <span className="text-primary">complex data analysis</span>
             </h1>
             <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl">
-              Data Whisperer delivers intelligent document processing and data analysis, 
-              powering complete automation for your business workflows.
+              SPARS Lens delivers database intelligence — chat, SQL, dashboards, and insights in one place.
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               {isAuthenticated ? (
@@ -107,24 +101,21 @@ export default function Homepage() {
                     Get started
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  <Button size="lg" variant="outline" onClick={() => navigate("/pricing")} className="text-base">
-                    View Pricing
-                  </Button>
                 </>
               )}
             </div>
             <div className="mt-16 flex items-center justify-center gap-x-8 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
-                <span>Free plan available</span>
+                <span>Executive-ready dashboards</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
-                <span>No credit card required</span>
+                <span>Secure database connections</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
-                <span>Setup in minutes</span>
+                <span>Reviewable SQL outputs</span>
               </div>
             </div>
           </div>
@@ -135,8 +126,11 @@ export default function Homepage() {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                Trusted by teams worldwide
+                Built for leadership visibility
               </h2>
+              <p className="mt-4 text-lg leading-8 text-muted-foreground">
+                Make confident decisions with clear, traceable answers from your database — without waiting on manual reporting cycles.
+              </p>
             </div>
             <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
               {stats.map((stat) => (
@@ -157,8 +151,7 @@ export default function Homepage() {
                 Everything you need to analyze your data
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                From high-accuracy parsing to fully automated workflows — Data Whisperer gives you 
-                modular components to build data analysis tools tailored to your needs.
+                Built for database workflows — from question to SQL to charts and dashboards.
               </p>
             </div>
             <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -177,6 +170,35 @@ export default function Homepage() {
                 );
               })}
             </div>
+
+            {/* Simple flow visual (no extra deps) */}
+            <div className="mx-auto mt-10 max-w-4xl">
+              <div className="rounded-xl border bg-background/60 p-5 sm:p-6 overflow-hidden">
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
+                  {([
+                    { title: "Database", subtitle: "Your tables & schema" },
+                    { title: "SPARS Lens", subtitle: "AI understanding" },
+                    { title: "SQL + Results", subtitle: "Queries & tables" },
+                    { title: "Dashboards", subtitle: "Charts & reports" },
+                  ] as const).map((node, idx, arr) => (
+                    <div key={node.title} className="flex items-center w-full sm:w-auto sm:max-w-full">
+                      <div className="flex-1 sm:flex-none rounded-lg border bg-muted/30 px-4 py-3 text-center w-full sm:w-auto sm:min-w-[160px] max-w-full">
+                        <div className="font-semibold text-foreground">{node.title}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{node.subtitle}</div>
+                      </div>
+                      {idx < arr.length - 1 && (
+                        <div className="hidden sm:flex items-center px-3 text-muted-foreground select-none" aria-hidden>
+                          →
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 text-center text-xs text-muted-foreground">
+                  Ask a question → get SQL → validate results → save and visualize.
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -185,11 +207,10 @@ export default function Homepage() {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                Unlock data automation across industries
+                Built for database teams
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                From finance to healthcare to manufacturing — Data Whisperer adapts seamlessly 
-                to dozens of industry-specific domains.
+                Empower analysts and operators to explore data, validate SQL, and ship insights faster.
               </p>
             </div>
             <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -216,10 +237,10 @@ export default function Homepage() {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                Start building your first data analysis workflow today
+                Start asking better questions of your database today
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                Data Whisperer gets you from raw data to real automation — fast.
+                SPARS Lens helps you go from question to SQL to dashboard — fast.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 {isAuthenticated ? (
@@ -233,9 +254,6 @@ export default function Homepage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
-                <Button size="lg" variant="outline" onClick={() => navigate("/contact")} className="text-base">
-                  Contact sales
-                </Button>
               </div>
             </div>
           </div>

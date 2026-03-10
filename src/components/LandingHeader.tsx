@@ -12,13 +12,6 @@ export default function LandingHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isAuthenticated = !!getAuthToken();
 
-  const navigation = [
-    { name: "Home", href: "/" },
-    { name: "Pricing", href: "/pricing" },
-    { name: "Blog", href: "/blog" },
-    { name: "Contact", href: "/contact" },
-  ];
-
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 overflow-visible">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 h-16 overflow-visible lg:px-8" aria-label="Global">
@@ -28,18 +21,7 @@ export default function LandingHeader() {
           </Link>
         </div>
         
-        {/* Desktop Navigation */}
-        <div className="hidden lg:flex lg:gap-x-8">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              to={item.href}
-              className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
-            >
-              {item.name}
-            </Link>
-          ))}
-        </div>
+        {/* Desktop Navigation intentionally removed for public homepage */}
 
         <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:items-center lg:gap-4">
           <Button
@@ -91,16 +73,7 @@ export default function LandingHeader() {
                 </Link>
                 
                 <div className="flex flex-col gap-2 mt-4">
-                  {navigation.map((item) => (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="text-base font-semibold leading-6 text-foreground hover:text-primary transition-colors py-2"
-                    >
-                      {item.name}
-                    </Link>
-                  ))}
+                  {/* Mobile navigation links intentionally removed */}
                 </div>
 
                 <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
