@@ -22,7 +22,6 @@ import { saveDashboardGraph } from "@/lib/api";
 import SaveNameModal from "@/components/SaveNameModal";
 import {
   detectColumnMeta,
-  getAvailableGraphTypes,
   prepareChartData,
   renderChart,
   CHART_COLORS,
@@ -78,14 +77,15 @@ export default function GraphPreview({
   const { toast } = useToast();
   const chartRef = useRef<HTMLDivElement>(null);
 
+  const ALL_GRAPH_TYPES: GraphType[] = ["bar", "line", "pie", "area", "scatter"];
+
   const colMeta = detectColumnMeta(tableData, tableColumns);
-  const availableTypes = getAvailableGraphTypes(colMeta);
   const numericCols = colMeta.filter((c) => c.isNumeric).map((c) => c.name);
   const categoryCols = colMeta.filter((c) => c.isCategorical).map((c) => c.name);
   const allCols = tableColumns;
 
   const [graphType, setGraphType] = useState<GraphType>(
-    () => (initialGraphType && availableTypes.includes(initialGraphType) ? initialGraphType : (availableTypes[0] || "bar"))
+    () => (initialGraphType && ALL_GRAPH_TYPES.includes(initialGraphType) ? initialGraphType : "bar")
   );
   const [xKey, setXKey] = useState<string>(
     () => initialXKey || categoryCols[0] || allCols[0] || ""
@@ -101,20 +101,15 @@ export default function GraphPreview({
 
   // Sync from initial props when they change (e.g. selected graph instance)
   useEffect(() => {
-    if (initialGraphType && availableTypes.includes(initialGraphType)) setGraphType(initialGraphType);
+    if (initialGraphType && ALL_GRAPH_TYPES.includes(initialGraphType)) setGraphType(initialGraphType);
     if (initialXKey && tableColumns.includes(initialXKey)) setXKey(initialXKey);
     if (initialYKey && tableColumns.includes(initialYKey)) setYKey(initialYKey);
   }, [initialGraphType, initialXKey, initialYKey, tableColumns.join(",")]);
 
-  // When graph type changes, suggest valid axes
+  // When graph type changes, keep current axis selections if still valid
   useEffect(() => {
-    if (graphType === "pie") {
-      if (!categoryCols.includes(xKey) && categoryCols.length > 0) setXKey(categoryCols[0]);
-      if (!numericCols.includes(yKey) && numericCols.length > 0) setYKey(numericCols[0]);
-    } else if (graphType === "scatter") {
-      if (!numericCols.includes(xKey) && numericCols.length > 0) setXKey(numericCols[0]);
-      if (!numericCols.includes(yKey) && numericCols.length > 1) setYKey(numericCols[1]);
-    }
+    if (allCols.length && !allCols.includes(xKey)) setXKey(allCols[0]);
+    if (allCols.length && !allCols.includes(yKey)) setYKey(allCols[allCols.length > 1 ? 1 : 0]);
   }, [graphType]);
 
   const handleDownload = async (format: "png" | "svg" | "jpg") => {
@@ -172,17 +167,8 @@ export default function GraphPreview({
     }
   };
 
-  const getValidXCols = () => {
-    if (graphType === "pie") return categoryCols.length > 0 ? categoryCols : allCols;
-    if (graphType === "scatter") return numericCols.length > 0 ? numericCols : allCols;
-    return allCols;
-  };
-
-  const getValidYCols = () => {
-    if (graphType === "pie" || graphType === "bar" || graphType === "line" || graphType === "area" || graphType === "scatter")
-      return numericCols.length > 0 ? numericCols : allCols;
-    return allCols;
-  };
+  const getValidXCols = () => allCols;
+  const getValidYCols = () => allCols;
 
   if (!tableData.length || !tableColumns.length) {
     return (
@@ -202,7 +188,7 @@ export default function GraphPreview({
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Chart Type</Label>
           <div className="flex gap-2 flex-wrap">
-            {availableTypes.map((type) => (
+            {ALL_GRAPH_TYPES.map((type) => (
               <Button
                 key={type}
                 size="sm"
