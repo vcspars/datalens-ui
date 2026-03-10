@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/api";
+import { copyToClipboard } from "@/lib/clipboard";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -42,7 +43,7 @@ export default function PDFViewer({ pdfId }: PDFViewerProps) {
         setError(null);
         
         const token = localStorage.getItem("auth_token");
-        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://122.129.80.228:8005/api";
         
         // Create a blob URL from the PDF download
         const response = await fetch(`${API_BASE_URL}/datasets/${pdfId}/download`, {
@@ -659,12 +660,20 @@ export default function PDFViewer({ pdfId }: PDFViewerProps) {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                navigator.clipboard.writeText(extractedText);
-                toast({
-                  title: "Copied to clipboard",
-                  description: "Text has been copied to your clipboard",
-                });
+              onClick={async () => {
+                const ok = await copyToClipboard(extractedText);
+                toast(
+                  ok
+                    ? {
+                        title: "Copied to clipboard",
+                        description: "Text has been copied to your clipboard",
+                      }
+                    : {
+                        title: "Copy failed",
+                        description: "Clipboard is not available in this context.",
+                        variant: "destructive",
+                      },
+                );
               }}
             >
               Copy Text

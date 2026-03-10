@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import BookmarkedQuestionsDialog from "@/components/BookmarkedQuestionsDialog";
 import { useToast } from "@/hooks/use-toast";
+import { copyToClipboard } from "@/lib/clipboard";
 import {
   Send, Mic, MicOff, Loader2, Star, Maximize2, Minimize2,
   User, Copy, Check, BookmarkPlus, BarChart3, Sparkles, Download, Trash2,
@@ -129,7 +130,15 @@ function TableActions({
 
   const handleCopy = () => {
     console.log("[TableActions] Copying raw markdown to clipboard");
-    navigator.clipboard.writeText(message.content).then(() => {
+    copyToClipboard(message.content).then((ok) => {
+      if (!ok) {
+        toast({
+          title: "Copy failed",
+          description: "Clipboard is not available in this context.",
+          variant: "destructive",
+        });
+        return;
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -542,18 +551,20 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
 
   const handleCopyMessage = (message: Message) => {
     if (!message.content) return;
-    navigator.clipboard
-      .writeText(message.content)
-      .then(() => {
-        setCopiedMessageId(message.id);
-        setTimeout(() => {
-          setCopiedMessageId((prev) => (prev === message.id ? null : prev));
-        }, 2000);
-      })
-      .catch((err) => {
-        console.error("[ChatPanel] Copy error:", err);
-        toast({ title: "Copy failed", description: String(err), variant: "destructive" });
-      });
+    copyToClipboard(message.content).then((ok) => {
+      if (!ok) {
+        toast({
+          title: "Copy failed",
+          description: "Clipboard is not available in this context.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setCopiedMessageId(message.id);
+      setTimeout(() => {
+        setCopiedMessageId((prev) => (prev === message.id ? null : prev));
+      }, 2000);
+    });
   };
 
   // Derive the most relevant prompt for a given assistant message
@@ -789,9 +800,18 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                if (sqlPopupMessage?.sql_query) navigator.clipboard.writeText(sqlPopupMessage.sql_query);
-                toast({ title: "Copied", description: "SQL copied to clipboard." });
+              onClick={async () => {
+                const sql = sqlPopupMessage?.sql_query;
+                const ok = sql ? await copyToClipboard(sql) : false;
+                toast(
+                  ok
+                    ? { title: "Copied", description: "SQL copied to clipboard." }
+                    : {
+                        title: "Copy failed",
+                        description: "Clipboard is not available in this context.",
+                        variant: "destructive",
+                      },
+                );
               }}
             >
               <Copy className="h-3 w-3 mr-1" />
