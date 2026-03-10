@@ -20,46 +20,46 @@ export default function Homepage() {
   const features = [
     {
       icon: Database,
-      title: "Chat with Your Database",
-      description: "Ask questions in plain English and get accurate answers, tables, and SQL generated from your database.",
+      title: "Chat with Your Data",
+      description: "Ask questions in plain English and get accurate answers and data views—no technical skills required.",
     },
     {
       icon: Sparkles,
-      title: "AI SQL Assistance",
-      description: "Generate, inspect, and reuse SQL confidently with AI-assisted reasoning and context from your schema.",
+      title: "AI-Powered Answers",
+      description: "Get clear, reliable answers with AI that understands your data and business context.",
     },
     {
       icon: BarChart3,
       title: "Data Visualization",
-      description: "Turn query results into charts and dashboards for quick understanding and sharing.",
+      description: "Turn your results into charts and dashboards for quick understanding and sharing.",
     },
     {
       icon: TrendingUp,
       title: "Operational Insights",
-      description: "Identify trends, anomalies, and key KPIs from your live database with actionable summaries.",
+      description: "Identify trends, anomalies, and key KPIs from your data with actionable summaries.",
     },
     {
       icon: Database,
       title: "Saved Views & Dashboards",
-      description: "Save useful tables, charts, and reports to your dashboard for reuse and team workflows.",
+      description: "Save useful data views, charts, and reports to your dashboard for reuse and team workflows.",
     },
     {
       icon: Sparkles,
       title: "Reports & Summaries",
-      description: "Generate clear summaries from query results to share with stakeholders quickly.",
+      description: "Generate clear summaries from your results to share with stakeholders quickly.",
     },
   ];
 
   const stats = [
     { value: "Faster", label: "Decision-ready insights" },
-    { value: "Audit-ready", label: "SQL you can review & trust" },
+    { value: "Audit-ready", label: "Answers you can review & trust" },
     { value: "Secure", label: "Designed for enterprise governance" },
   ];
 
   const useCases = [
     {
       title: "Analytics & BI",
-      description: "Explore tables, validate metrics, and quickly answer business questions with generated SQL.",
+      description: "Explore your data, validate metrics, and quickly answer business questions—no technical setup.",
       icon: TrendingUp,
     },
     {
@@ -69,7 +69,7 @@ export default function Homepage() {
     },
     {
       title: "Reporting",
-      description: "Generate shareable tables, charts, and summaries from your database in minutes.",
+      description: "Generate shareable data views, charts, and summaries in minutes.",
       icon: BarChart3,
     },
   ];
@@ -87,7 +87,7 @@ export default function Homepage() {
               <span className="text-primary">complex data analysis</span>
             </h1>
             <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl">
-              SPARS Lens delivers database intelligence — chat, SQL, dashboards, and insights in one place.
+              SPARS Lens delivers data intelligence — ask questions, get answers, and build dashboards in one place.
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               {isAuthenticated ? (
@@ -111,11 +111,11 @@ export default function Homepage() {
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
-                <span>Secure database connections</span>
+                <span>Secure, governed access</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
-                <span>Reviewable SQL outputs</span>
+                <span>Reviewable answers & reports</span>
               </div>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function Homepage() {
                 Built for leadership visibility
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                Make confident decisions with clear, traceable answers from your database — without waiting on manual reporting cycles.
+                Make confident decisions with clear, traceable answers from your data — without waiting on manual reporting cycles.
               </p>
             </div>
             <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -151,7 +151,7 @@ export default function Homepage() {
                 Everything you need to analyze your data
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                Built for database workflows — from question to SQL to charts and dashboards.
+                Built for your workflow — from question to answers to charts and dashboards.
               </p>
             </div>
             <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -176,9 +176,9 @@ export default function Homepage() {
               <div className="rounded-xl border bg-background/60 p-5 sm:p-6 overflow-hidden">
                 <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
                   {([
-                    { title: "Database", subtitle: "Your tables & schema" },
+                    { title: "Your Data", subtitle: "Connected sources" },
                     { title: "SPARS Lens", subtitle: "AI understanding" },
-                    { title: "SQL + Results", subtitle: "Queries & tables" },
+                    { title: "Results", subtitle: "Answers & data" },
                     { title: "Dashboards", subtitle: "Charts & reports" },
                   ] as const).map((node, idx, arr) => (
                     <div key={node.title} className="flex items-center w-full sm:w-auto sm:max-w-full">
@@ -195,7 +195,7 @@ export default function Homepage() {
                   ))}
                 </div>
                 <div className="mt-4 text-center text-xs text-muted-foreground">
-                  Ask a question → get SQL → validate results → save and visualize.
+                  Ask a question → get answers → review results → save and visualize.
                 </div>
               </div>
             </div>
@@ -207,10 +207,10 @@ export default function Homepage() {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                Built for database teams
+                Built for your team
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                Empower analysts and operators to explore data, validate SQL, and ship insights faster.
+                Empower your team to explore data, validate metrics, and deliver insights faster.
               </p>
             </div>
             <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -237,10 +237,10 @@ export default function Homepage() {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                Start asking better questions of your database today
+                Start asking better questions of your data today
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                SPARS Lens helps you go from question to SQL to dashboard — fast.
+                SPARS Lens helps you go from question to answer to dashboard — fast.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 {isAuthenticated ? (
@@ -249,9 +249,11 @@ export default function Homepage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : (
-                  <Button size="lg" onClick={() => navigate("/auth")} className="text-base">
-                    Get started for free
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                  <Button size="lg" asChild className="text-base">
+                    <a href="https://www.sparsus.com/contact" target="_blank" rel="noopener noreferrer">
+                      Get started today
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </a>
                   </Button>
                 )}
               </div>
