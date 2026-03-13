@@ -291,9 +291,29 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const [sqlPopupMessage, setSqlPopupMessage] = useState<Message | null>(null);
   const lastUserPromptRef = useRef<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputAtVoiceStartRef = useRef("");
+
+  // Debug: log actual chat panel and scroll viewport widths whenever they change
+  useEffect(() => {
+    const el = chatPanelRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const viewport = el.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement | null;
+      const radixWrapper = viewport?.firstElementChild as HTMLElement | null;
+      const contentDiv = radixWrapper?.firstElementChild as HTMLElement | null;
+      console.log(
+        `[ChatPanel] panel=${el.clientWidth}px` +
+        `  viewport=${viewport?.clientWidth ?? "?"}px` +
+        `  radixWrapper=${radixWrapper?.clientWidth ?? "?"}px (display=${radixWrapper?.style.display ?? "?"})` +
+        `  contentDiv=${contentDiv?.clientWidth ?? "?"}px`
+      );
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Voice input: Web Speech API (built-in, no LLM)
   const startVoiceInput = useCallback(() => {
@@ -601,7 +621,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   // Render — exact same structure / classNames as Chatbot.tsx
   // -------------------------------------------------------------------------
   return (
-    <div className="flex flex-col h-full w-full min-w-0 overflow-hidden bg-chat-bg">
+    <div ref={chatPanelRef} className="flex flex-col h-full w-full min-w-0 overflow-hidden bg-chat-bg">
       {/* Header */}
       <div className="p-2.5 xl:p-4 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
         <div className="min-w-0 flex-1">
@@ -621,8 +641,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 min-w-0 py-2.5 xl:py-4 pl-2.5 xl:pl-4 pr-2.5 xl:pr-4" ref={scrollRef}>
-        <div className="space-y-2.5 xl:space-y-4 w-full min-w-0">
+      <ScrollArea className="flex-1 min-h-0 min-w-0" ref={scrollRef}>
+        <div className="space-y-2.5 xl:space-y-4 w-full min-w-0 px-2.5 xl:px-4 py-2.5 xl:py-4">
           {historyLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -648,7 +668,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                     )}
                   </Avatar>
 
-                  <div className="flex items-start gap-1 xl:gap-2 flex-1 min-w-0 overflow-visible">
+                  <div className="flex items-start gap-1 xl:gap-2 flex-1 min-w-0 overflow-hidden">
                     {/* Bookmark button on user messages */}
                     {message.role === "user" && (
                       <Button
@@ -661,14 +681,14 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                       </Button>
                     )}
 
-                    <div className="flex flex-col min-w-0 max-w-full w-full">
+                    <div className="flex flex-col min-w-0">
                       <div className={`rounded-lg p-2 xl:p-3 min-w-0 ${
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground break-words overflow-hidden"
-                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible w-full"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible"
                       }`}>
                         {message.role === "user" ? (
-                          <p className="text-xs xl:text-sm whitespace-pre-wrap break-words min-w-0">{message.content}</p>
+                          <p className="text-xs xl:text-sm whitespace-pre-wrap break-words min-w-0" style={{ wordBreak: "break-word" }}>{message.content}</p>
                         ) : (
                           <>
                             {message.content ? (
@@ -1528,8 +1548,18 @@ const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    const dividerWidth = 4;
     const newLeft = ((e.clientX - rect.left) / rect.width) * 100;
-    if (newLeft > 20 && newLeft < 75) setLeftWidth(newLeft);
+    const leftPx = (newLeft / 100) * rect.width;
+    const rightPx = rect.width - leftPx - dividerWidth;
+    const minPx = 600;
+    const allowed = leftPx >= minPx && rightPx >= minPx && newLeft < 80;
+
+    console.log(
+      `[Resizer] container=${rect.width.toFixed(0)}px  left=${leftPx.toFixed(0)}px (${newLeft.toFixed(1)}%)  right=${rightPx.toFixed(0)}px  divider=${dividerWidth}px  allowed=${allowed}`
+    );
+
+    if (allowed) setLeftWidth(newLeft);
   }, []);
 
   const handleMouseUp = useCallback(() => {
@@ -1565,7 +1595,7 @@ const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll
         {!tabsFullscreen && (
           <div
             style={chatFullscreen ? { width: "100%" } : { width: `${leftWidth}%` }}
-            className="h-full min-w-0 overflow-hidden transition-all duration-300 hidden lg:flex flex-col"
+            className="h-full overflow-hidden transition-[width] duration-300 hidden lg:flex flex-col flex-shrink-0 flex-grow-0"
           >
             <ChatPanel
               isFullscreen={chatFullscreen}
@@ -1592,8 +1622,8 @@ const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll
         {/* Right — data tabs */}
         {!chatFullscreen && (
           <div
-            style={tabsFullscreen ? { width: "100%" } : { width: `${100 - leftWidth}%` }}
-            className="h-full bg-background transition-all duration-300 flex-1 min-w-0"
+            style={tabsFullscreen ? { width: "100%" } : undefined}
+            className="h-full bg-background transition-[width] duration-300 flex-1 min-w-0 overflow-hidden"
           >
             <DatabaseTabs
               activeTab={activeRightTab}
@@ -1621,3 +1651,4 @@ const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll
     </div>
   );
 }
+        {/* Draggable divider */}
