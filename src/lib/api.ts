@@ -82,13 +82,21 @@ export const apiRequest = async <T>(
       }
       throw new Error(message);
     }
-    let error: { detail?: string };
+    let error: { detail?: unknown };
     try {
       error = await response.json();
     } catch {
       error = { detail: response.statusText };
     }
-    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    let message: string;
+    if (Array.isArray(error.detail)) {
+      message = error.detail.map((e: { msg?: string }) => e.msg || "").filter(Boolean).join(". ") || "Validation error";
+    } else if (typeof error.detail === "string") {
+      message = error.detail;
+    } else {
+      message = `HTTP error! status: ${response.status}`;
+    }
+    throw new Error(message);
   }
 
   if (response.status === 204) return undefined as T;

@@ -26,6 +26,17 @@ const legendFormatter = (value: string) => (
   <span style={{ fontSize: 10 }}>{value}</span>
 );
 
+/** Format a numeric value with comma separators (e.g. 1,234,567.89). */
+function formatNumberWithCommas(value: unknown): string {
+  if (value == null) return "";
+  const num = typeof value === "number" ? value : Number(value);
+  if (isNaN(num)) return String(value);
+  return num.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+const tooltipFormatter = (value: unknown) => formatNumberWithCommas(value);
+const axisTickFormatter = (value: unknown) => formatNumberWithCommas(value);
+
 /** Custom legend content: 12 items per column, then new column to the right. Used only for export modal. */
 function MultiColumnLegendContent({
   payload = [],
@@ -156,8 +167,8 @@ export function renderChart(
         <BarChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-          <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip />
+          <YAxis tick={{ fontSize: 11 }} tickFormatter={axisTickFormatter} />
+          <Tooltip formatter={tooltipFormatter} />
           <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Bar dataKey={yKey} fill={colors[0]} radius={[4, 4, 0, 0]} />
         </BarChart>
@@ -167,8 +178,8 @@ export function renderChart(
         <LineChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-          <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip />
+          <YAxis tick={{ fontSize: 11 }} tickFormatter={axisTickFormatter} />
+          <Tooltip formatter={tooltipFormatter} />
           <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Line type="monotone" dataKey={yKey} stroke={colors[0]} strokeWidth={2} dot={false} />
         </LineChart>
@@ -178,8 +189,8 @@ export function renderChart(
         <AreaChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-          <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip />
+          <YAxis tick={{ fontSize: 11 }} tickFormatter={axisTickFormatter} />
+          <Tooltip formatter={tooltipFormatter} />
           <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Area type="monotone" dataKey={yKey} stroke={colors[0]} fill={`${colors[0]}33`} strokeWidth={2} />
         </AreaChart>
@@ -200,7 +211,7 @@ export function renderChart(
               <Cell key={i} fill={colors[i % colors.length]} />
             ))}
           </Pie>
-          <Tooltip />
+          <Tooltip formatter={tooltipFormatter} />
           <Legend
             layout="vertical"
             align="right"
@@ -226,8 +237,8 @@ export function renderChart(
         <ScatterChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis dataKey={xKey} name={xKey} tick={{ fontSize: 11 }} />
-          <YAxis dataKey={yKey} name={yKey} tick={{ fontSize: 11 }} />
-          <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+          <YAxis dataKey={yKey} name={yKey} tick={{ fontSize: 11 }} tickFormatter={axisTickFormatter} />
+          <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={tooltipFormatter} />
           <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
           <Scatter data={data} fill={colors[0]} />
         </ScatterChart>

@@ -46,7 +46,12 @@ export default function Auth() {
     const password = formData.get("signup-password") as string;
     const confirm_password = formData.get("signup-confirm") as string;
 
-    // Validate password match
+    if (password.length < 8) {
+      toast.error("Password can't be shorter than 8 characters.");
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== confirm_password) {
       toast.error("Passwords do not match");
       setIsLoading(false);
