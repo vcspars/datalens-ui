@@ -603,10 +603,10 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   return (
     <div className="flex flex-col h-full w-full min-w-0 overflow-hidden bg-chat-bg">
       {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
+      <div className="p-2.5 xl:p-4 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
         <div className="min-w-0 flex-1">
-          <h2 className="text-base sm:text-lg font-semibold text-foreground truncate">Chat Assistant</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground truncate">
+          <h2 className="text-sm xl:text-lg font-semibold text-foreground truncate">Chat Assistant</h2>
+          <p className="text-xs text-muted-foreground truncate">
             Talk to your database in natural language. 
           </p>
         </div>
@@ -621,8 +621,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 min-w-0 py-3 sm:py-4 pl-3 sm:pl-4 pr-3 sm:pr-4" ref={scrollRef}>
-        <div className="space-y-3 sm:space-y-4 w-full min-w-0">
+      <ScrollArea className="flex-1 min-h-0 min-w-0 py-2.5 xl:py-4 pl-2.5 xl:pl-4 pr-2.5 xl:pr-4" ref={scrollRef}>
+        <div className="space-y-2.5 xl:space-y-4 w-full min-w-0">
           {historyLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -633,12 +633,12 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 key={message.id}
                 className={`group flex min-w-0 ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div className={`flex items-start gap-2 sm:gap-3 min-w-0 ${message.role === "user" ? "max-w-[85%] flex-row-reverse" : "max-w-[95%] flex-row"}`}>
+                <div className={`flex items-start gap-1.5 xl:gap-3 min-w-0 ${message.role === "user" ? "max-w-[85%] flex-row-reverse" : "max-w-[95%] flex-row"}`}>
                   {/* Avatar */}
-                  <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 mt-1">
+                  <Avatar className="h-6 w-6 xl:h-8 xl:w-8 flex-shrink-0 mt-1">
                     {message.role === "user" ? (
                       <AvatarFallback className="bg-primary text-primary-foreground">
-                        <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <User className="h-3 w-3 xl:h-4 xl:w-4" />
                       </AvatarFallback>
                     ) : (
                       <>
@@ -648,34 +648,34 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                     )}
                   </Avatar>
 
-                  <div className="flex items-start gap-1 sm:gap-2 flex-1 min-w-0 overflow-visible">
+                  <div className="flex items-start gap-1 xl:gap-2 flex-1 min-w-0 overflow-visible">
                     {/* Bookmark button on user messages */}
                     {message.role === "user" && (
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleBookmarkQuestion(message.id, message.content)}
-                        className="h-6 w-6 sm:h-7 sm:w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1"
+                        className="h-6 w-6 xl:h-7 xl:w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1"
                       >
-                        <Star className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground hover:text-primary" />
+                        <Star className="h-3 w-3 xl:h-4 xl:w-4 text-muted-foreground hover:text-primary" />
                       </Button>
                     )}
 
                     <div className="flex flex-col min-w-0 max-w-full w-full">
-                      <div className={`rounded-lg p-2 sm:p-3 min-w-0 ${
+                      <div className={`rounded-lg p-2 xl:p-3 min-w-0 ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground break-words overflow-hidden"
                           : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible w-full"
                       }`}>
                         {message.role === "user" ? (
-                          <p className="text-xs sm:text-sm whitespace-pre-wrap break-words min-w-0">{message.content}</p>
+                          <p className="text-xs xl:text-sm whitespace-pre-wrap break-words min-w-0">{message.content}</p>
                         ) : (
                           <>
                             {message.content ? (
-                              <MarkdownMessage content={message.content} className="text-xs sm:text-sm" />
+                              <MarkdownMessage content={message.content} className="text-xs xl:text-sm" />
                             ) : (
-                              <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin flex-shrink-0" />
+                              <span className="inline-flex items-center gap-2 text-xs xl:text-sm text-muted-foreground">
+                                <Loader2 className="h-3.5 w-3.5 xl:h-4 xl:w-4 animate-spin flex-shrink-0" />
                                 Thinking…
                               </span>
                             )}
@@ -685,7 +685,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                             )}
                           </>
                         )}
-                        <span className="text-[10px] sm:text-xs opacity-70 mt-1 block">
+                        <span className="text-[10px] xl:text-xs opacity-70 mt-1 block">
                           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
@@ -740,14 +740,14 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-3 sm:p-4 border-t border-border bg-background flex-shrink-0">
+      <div className="p-2.5 xl:p-4 border-t border-border bg-background flex-shrink-0">
         <div className="flex gap-2 w-full">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask a question about your data..."
-            className="min-h-[50px] sm:min-h-[60px] max-h-[100px] sm:max-h-[120px] resize-none flex-1"
+            className="min-h-[44px] xl:min-h-[60px] max-h-[100px] xl:max-h-[120px] resize-none flex-1 text-xs xl:text-sm"
             disabled={isLoading}
           />
           <div className="flex flex-col gap-2 flex-shrink-0">
@@ -757,11 +757,11 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 onClick={() => handleSend()}
                 disabled={!input.trim() || isLoading}
                 size="icon"
-                className="h-[50px] sm:h-[60px] w-10 sm:w-12"
+                className="h-[44px] xl:h-[60px] w-10 xl:w-12"
               >
                 {isLoading
-                  ? <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                  : <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                  ? <Loader2 className="h-4 w-4 xl:h-5 xl:w-5 animate-spin" />
+                  : <Send className="h-4 w-4 xl:h-5 xl:w-5" />
                 }
               </Button>
             </div>
@@ -775,8 +775,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 <span className="absolute inset-0 rounded-md bg-destructive/40 animate-ping" aria-hidden />
               )}
               {isRecording
-                ? <Mic className="h-3 w-3 sm:h-4 sm:w-4 relative z-10" />
-                : <Mic className="h-3 w-3 sm:h-4 sm:w-4" />
+                ? <Mic className="h-3 w-3 xl:h-4 xl:w-4 relative z-10" />
+                : <Mic className="h-3 w-3 xl:h-4 xl:w-4" />
               }
             </Button>
           </div>
@@ -1400,7 +1400,9 @@ function DatabaseTabs({
 // Main page — exact same container / resizing logic as Dashboard.tsx
 // ---------------------------------------------------------------------------
 export default function ChatWithDatabase() {
-  const [leftWidth, setLeftWidth] = useState(45);
+  const [leftWidth, setLeftWidth] = useState(
+    typeof window !== "undefined" && window.innerWidth < 1440 ? 40 : 45
+  );
   const [chatFullscreen, setChatFullscreen] = useState(false);
   const [tabsFullscreen, setTabsFullscreen] = useState(false);
   const [graphInstances, setGraphInstances] = useState<GraphInstance[]>([]);
@@ -1527,7 +1529,7 @@ const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll
     if (!isDragging.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const newLeft = ((e.clientX - rect.left) / rect.width) * 100;
-    if (newLeft > 25 && newLeft < 75) setLeftWidth(newLeft);
+    if (newLeft > 20 && newLeft < 75) setLeftWidth(newLeft);
   }, []);
 
   const handleMouseUp = useCallback(() => {
