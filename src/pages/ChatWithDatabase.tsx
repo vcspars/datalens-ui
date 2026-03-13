@@ -633,7 +633,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 key={message.id}
                 className={`group flex min-w-0 ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div className={`flex items-start gap-2 sm:gap-3 min-w-0 ${message.role === "user" ? "max-w-full flex-row-reverse" : "max-w-[95%] flex-row"}`}>
+                <div className={`flex items-start gap-2 sm:gap-3 min-w-0 ${message.role === "user" ? "max-w-[85%] flex-row-reverse" : "max-w-[95%] flex-row"}`}>
                   {/* Avatar */}
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 mt-1">
                     {message.role === "user" ? (
@@ -648,7 +648,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                     )}
                   </Avatar>
 
-                  <div className="flex items-start gap-1 sm:gap-2 flex-1 min-w-0 overflow-hidden">
+                  <div className="flex items-start gap-1 sm:gap-2 flex-1 min-w-0 overflow-visible">
                     {/* Bookmark button on user messages */}
                     {message.role === "user" && (
                       <Button
@@ -664,8 +664,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                     <div className="flex flex-col min-w-0 max-w-full w-full">
                       <div className={`rounded-lg p-2 sm:p-3 min-w-0 ${
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground overflow-visible"
-                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible w-full max-w-[calc(100%-1rem)]"
+                          ? "bg-primary text-primary-foreground break-words overflow-hidden"
+                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible w-full"
                       }`}>
                         {message.role === "user" ? (
                           <p className="text-xs sm:text-sm whitespace-pre-wrap break-words min-w-0">{message.content}</p>

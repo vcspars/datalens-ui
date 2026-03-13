@@ -26,7 +26,7 @@ function SectionHeading({
   return (
     <h2
       id={id}
-      className="text-xl font-semibold text-foreground mt-8 mb-3 scroll-mt-24 first:mt-0"
+      className="text-2xl font-bold text-foreground mt-8 mb-3 scroll-mt-24 first:mt-0"
     >
       {children}
     </h2>
@@ -35,7 +35,7 @@ function SectionHeading({
 
 function SubHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-base font-semibold text-foreground mt-5 mb-2">
+    <h3 className="text-lg font-semibold text-foreground mt-5 mb-2">
       {children}
     </h3>
   );
@@ -102,10 +102,10 @@ export default function Help() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <div className="flex max-w-6xl mx-auto">
+      <div className="flex max-w-7xl mx-auto px-6">
         {/* Left: sticky sidebar */}
         <aside className="hidden lg:block w-64 flex-shrink-0 border-r border-border bg-background/95">
-          <div className="sticky top-16 py-6 pl-6 pr-3 overflow-y-auto max-h-[calc(100vh-4rem)]">
+          <div className="sticky top-16 py-6 pl-0 pr-3 overflow-y-auto max-h-[calc(100vh-4rem)]">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen className="h-5 w-5 text-primary" />
               <span className="font-semibold text-foreground">User Manual</span>
@@ -141,8 +141,8 @@ export default function Help() {
         </aside>
 
         {/* Right: doc content */}
-        <main className="flex-1 min-w-0 py-8 px-6 lg:px-10 pb-16" id="help-doc-content">
-          <div className="prose prose-sm max-w-none text-foreground">
+        <main className="flex-1 min-w-0 py-6 px-6 lg:px-10 pb-16" id="help-doc-content">
+          <div className="prose max-w-none text-foreground prose-p:text-sm prose-li:text-sm prose-p:leading-relaxed prose-li:leading-relaxed">
             <SectionHeading id="overview">Overview</SectionHeading>
             <p className="text-muted-foreground leading-relaxed">
               {highlightContent(
