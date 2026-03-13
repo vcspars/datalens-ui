@@ -8,7 +8,7 @@ export default function LandingFooter() {
             Transform your documents and data into intelligent insights with AI-powered analysis and automation.
           </p>
           <p className="text-xs text-muted-foreground">
-            &copy; 2026 Data Whisperer. All rights reserved.
+            &copy; 2026 SPARS Lens. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
             Powered by <span className="text-primary font-medium">SPARS</span>
