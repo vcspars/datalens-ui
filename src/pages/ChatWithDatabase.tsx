@@ -13,6 +13,7 @@
  * "Convert to Graph" populates the Graphs tab on the right panel.
  */
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import Header from "@/components/Header";
 import MarkdownMessage from "@/components/MarkdownMessage";
 import GraphPreview from "@/components/GraphPreview";
@@ -69,6 +70,9 @@ interface TableEntry {
 
 interface Message {
   id: string;
+  /** Real MongoDB _id — set from history or from the 'saved' SSE event.
+   *  Used for deletion. May be absent for messages not yet persisted. */
+  db_id?: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
@@ -293,9 +297,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
   const lastUserPromptRef = useRef<string>("");
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const chatPanelRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputAtVoiceStartRef = useRef("");
 
@@ -382,12 +385,13 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     };
   }, []);
 
-  // Auto-scroll to the latest message (anchor at the start of the last message)
+  // After history finishes loading, jump to the last message.
+  // During active chat, Virtuoso's followOutput="smooth" handles new messages automatically.
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!historyLoading && messages.length > 0) {
+      virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, behavior: "auto" });
     }
-  }, [messages, historyLoading]);
+  }, [historyLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load history on mount
   useEffect(() => {
@@ -412,6 +416,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         } else {
           const historyMessages: Message[] = data.messages.map((m: ChatMessageItem) => ({
             id: m.id,
+            db_id: m.id, // history messages already carry the real MongoDB _id
             role: m.role as "user" | "assistant",
             content: m.content,
             timestamp: new Date(m.created_at),
@@ -510,6 +515,13 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             allTables = (event.tables as TableEntry[]) || [];
             sqlQuery = (event.sql_query as string) || "";
             console.log(`[ChatPanel] Done | has_table=${hasTable} | tables=${allTables.length} | sql_query=${!!sqlQuery}`);
+          } else if (event.type === "saved") {
+            // Backend confirmed the assistant message was persisted — store the real MongoDB _id
+            const dbId = event.assistant_db_id as string;
+            console.log("[ChatPanel] Assistant message saved to DB | db_id:", dbId);
+            setMessages(prev => prev.map(m =>
+              m.id === assistantId ? { ...m, db_id: dbId } : m
+            ));
           } else if (event.type === "error") {
             console.error("[ChatPanel] SSE error:", event.content);
             toast({ title: "Error", description: event.content as string, variant: "destructive" });
@@ -591,7 +603,18 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   };
 
   const handleDeleteMessage = async (message: Message) => {
-    // Find the paired message (user question for assistant, or assistant for user)
+    // db_id is the real MongoDB ObjectId — required for backend deletion.
+    // It is set either from history load or from the 'saved' SSE event.
+    if (!message.db_id) {
+      toast({
+        title: "Cannot delete yet",
+        description: "The message is still being saved. Please try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Find the paired message in local state for UI removal
     const idx = messages.findIndex((m) => m.id === message.id);
     let pairedId: string | null = null;
     if (message.role === "assistant" && idx > 0) {
@@ -605,7 +628,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     }
     try {
       setIsDeletingMessage(true);
-      await deleteChatMessage(message.id);
+      // Use db_id (MongoDB ObjectId) — NOT the local frontend id
+      await deleteChatMessage(message.db_id);
       setMessages((prev) => prev.filter((m) => m.id !== message.id && m.id !== pairedId));
       setDeleteConfirmMessage(null);
       toast({ title: "Deleted", description: "Message removed." });
@@ -669,135 +693,136 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         </Button>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 min-w-0" ref={scrollRef}>
-        <div className="space-y-2.5 xl:space-y-4 w-full min-w-0 px-2.5 xl:px-4 py-2.5 xl:py-4">
-          {historyLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            messages.map((message, idx) => (
-              <div
-                key={message.id}
-                className={`group flex min-w-0 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div className={`flex items-start gap-1.5 xl:gap-3 min-w-0 ${message.role === "user" ? "max-w-[85%] flex-row-reverse" : "max-w-[95%] flex-row"}`}>
-                  {/* Avatar */}
-                  <Avatar className="h-6 w-6 xl:h-8 xl:w-8 flex-shrink-0 mt-1">
-                    {message.role === "user" ? (
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        <User className="h-3 w-3 xl:h-4 xl:w-4" />
-                      </AvatarFallback>
-                    ) : (
-                      <>
-                        <AvatarImage src="/Lens.png" alt="SPARSlens" className="object-contain bg-background" />
-                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">D</AvatarFallback>
-                      </>
-                    )}
-                  </Avatar>
+      {/* Messages — virtualised list so long chats stay fast */}
+      {historyLoading ? (
+        <div className="flex-1 flex justify-center items-center min-h-0">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <Virtuoso
+          ref={virtuosoRef}
+          style={{ flex: 1, minHeight: 0, width: "100%" }}
+          data={messages}
+          followOutput="smooth"
+          increaseViewportBy={{ top: 600, bottom: 600 }}
+          itemContent={(index, message) => (
+            <div
+              className={`group flex min-w-0 px-2.5 xl:px-4 ${index === 0 ? "pt-2.5 xl:pt-4" : ""} pb-2.5 xl:pb-4 ${message.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`flex items-start gap-1.5 xl:gap-3 min-w-0 ${message.role === "user" ? "max-w-[85%] flex-row-reverse" : "max-w-[95%] flex-row"}`}>
+                {/* Avatar */}
+                <Avatar className="h-6 w-6 xl:h-8 xl:w-8 flex-shrink-0 mt-1">
+                  {message.role === "user" ? (
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      <User className="h-3 w-3 xl:h-4 xl:w-4" />
+                    </AvatarFallback>
+                  ) : (
+                    <>
+                      <AvatarImage src="/Lens.png" alt="SPARSlens" className="object-contain bg-background" />
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">D</AvatarFallback>
+                    </>
+                  )}
+                </Avatar>
 
-                  <div className="flex items-start gap-1 xl:gap-2 flex-1 min-w-0 overflow-hidden">
-                    {/* Bookmark button on user messages */}
-                    {message.role === "user" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleBookmarkQuestion(message.id, message.content)}
-                        className="h-6 w-6 xl:h-7 xl:w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1"
-                      >
-                        <Star className="h-3 w-3 xl:h-4 xl:w-4 text-muted-foreground hover:text-primary" />
-                      </Button>
-                    )}
+                <div className="flex items-start gap-1 xl:gap-2 flex-1 min-w-0 overflow-hidden">
+                  {/* Bookmark button on user messages */}
+                  {message.role === "user" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleBookmarkQuestion(message.id, message.content)}
+                      className="h-6 w-6 xl:h-7 xl:w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1"
+                    >
+                      <Star className="h-3 w-3 xl:h-4 xl:w-4 text-muted-foreground hover:text-primary" />
+                    </Button>
+                  )}
 
-                    <div className="flex flex-col min-w-0">
-                      <div className={`rounded-lg p-2 xl:p-3 min-w-0 ${
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible"
-                      }`}>
-                        {message.role === "user" ? (
-                          <p className="text-xs xl:text-sm whitespace-pre-wrap break-words min-w-0" style={{ wordBreak: "break-word" }}>{message.content}</p>
-                        ) : (
-                          <>
-                            {message.content ? (
-                              <MarkdownMessage content={message.content} className="text-xs xl:text-sm" />
-                            ) : (
-                              <span className="inline-flex items-center gap-2 text-xs xl:text-sm text-muted-foreground">
-                                <Loader2 className="h-3.5 w-3.5 xl:h-4 xl:w-4 animate-spin flex-shrink-0" />
-                                Thinking…
-                              </span>
-                            )}
-                            {/* Blinking cursor while streaming and we already have content */}
-                            {message.isStreaming && message.content && (
-                              <span className="inline-block w-0.5 h-3.5 bg-primary animate-pulse ml-0.5 align-middle" />
-                            )}
-                          </>
-                        )}
-                        <span className="text-[10px] xl:text-xs opacity-70 mt-1 block">
-                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      {/* Actions rendered OUTSIDE the bubble */}
-                      {!message.isStreaming && (
+                  <div className="flex flex-col min-w-0">
+                    <div className={`rounded-lg p-2 xl:p-3 min-w-0 ${
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible"
+                    }`}>
+                      {message.role === "user" ? (
+                        <p className="text-xs xl:text-sm whitespace-pre-wrap break-words min-w-0" style={{ wordBreak: "break-word" }}>{message.content}</p>
+                      ) : (
                         <>
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap pl-1">
-                            {message.has_table ? (
-                              <TableActions
-                                message={message}
-                                sourcePrompt={getPromptForMessage(message)}
-                                onOpenConvertDialog={handleOpenConvertDialog}
-                                onSaveToDashboard={handleSaveToDashboardFromChat}
-                              />
-                            ) : message.role === "assistant" && message.content && message.id !== "welcome" ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1.5"
-                                onClick={() => handleCopyMessage(message)}
-                              >
-                                {copiedMessageId === message.id ? (
-                                  <Check className="h-3 w-3 text-green-500" />
-                                ) : (
-                                  <Copy className="h-3 w-3" />
-                                )}
-                                {copiedMessageId === message.id ? "Copied" : "Copy"}
-                              </Button>
-                            ) : null}
-                            {message.sql_query && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1.5"
-                                onClick={() => setSqlPopupMessage(message)}
-                                aria-label="View SQL"
-                              >
-                                SQL
-                              </Button>
-                            )}
-                            {message.role === "assistant" && message.id !== "welcome" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
-                                onClick={() => setDeleteConfirmMessage(message)}
-                                aria-label="Delete message"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
+                          {message.content ? (
+                            <MarkdownMessage content={message.content} className="text-xs xl:text-sm" />
+                          ) : (
+                            <span className="inline-flex items-center gap-2 text-xs xl:text-sm text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 xl:h-4 xl:w-4 animate-spin flex-shrink-0" />
+                              Thinking…
+                            </span>
+                          )}
+                          {/* Blinking cursor while streaming and we already have content */}
+                          {message.isStreaming && message.content && (
+                            <span className="inline-block w-0.5 h-3.5 bg-primary animate-pulse ml-0.5 align-middle" />
+                          )}
                         </>
                       )}
+                      <span className="text-[10px] xl:text-xs opacity-70 mt-1 block">
+                        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
                     </div>
+                    {/* Actions rendered OUTSIDE the bubble */}
+                    {!message.isStreaming && (
+                      <>
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap pl-1">
+                          {message.has_table ? (
+                            <TableActions
+                              message={message}
+                              sourcePrompt={getPromptForMessage(message)}
+                              onOpenConvertDialog={handleOpenConvertDialog}
+                              onSaveToDashboard={handleSaveToDashboardFromChat}
+                            />
+                          ) : message.role === "assistant" && message.content && message.id !== "welcome" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1.5"
+                              onClick={() => handleCopyMessage(message)}
+                            >
+                              {copiedMessageId === message.id ? (
+                                <Check className="h-3 w-3 text-green-500" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                              {copiedMessageId === message.id ? "Copied" : "Copy"}
+                            </Button>
+                          ) : null}
+                          {message.sql_query && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1.5"
+                              onClick={() => setSqlPopupMessage(message)}
+                              aria-label="View SQL"
+                            >
+                              SQL
+                            </Button>
+                          )}
+                          {message.role === "assistant" && message.id !== "welcome" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteConfirmMessage(message)}
+                              aria-label="Delete message"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-            ))
+            </div>
           )}
-          <div ref={bottomRef} />
-        </div>
-      </ScrollArea>
+        />
+      )}
 
       {/* Input */}
       <div className="p-2.5 xl:p-4 border-t border-border bg-background flex-shrink-0">
