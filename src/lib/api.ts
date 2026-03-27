@@ -120,6 +120,7 @@ export interface SignupRequest {
   password: string;
   full_name: string;
   confirm_password: string;
+  role: "executive" | "sales" | "operations";
 }
 
 export interface LoginRequest {
@@ -136,6 +137,7 @@ export interface UserResponse {
   id: string;
   email: string;
   full_name: string;
+  role: string;
 }
 
 export const signup = async (data: SignupRequest): Promise<TokenResponse> => {
@@ -194,6 +196,11 @@ export const getChatHistory = async (): Promise<ChatHistoryResponse> => {
 export const clearChatHistory = async (): Promise<void> => {
   console.log("[API] clearChatHistory");
   await apiRequest<void>("/chat/history", { method: "DELETE" });
+};
+
+export const deleteChatMessage = async (messageId: string): Promise<void> => {
+  console.log("[API] deleteChatMessage:", messageId);
+  await apiRequest<void>(`/chat/messages/${messageId}`, { method: "DELETE" });
 };
 
 // ---------------------------------------------------------------------------

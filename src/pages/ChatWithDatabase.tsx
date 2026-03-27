@@ -43,6 +43,7 @@ import {
   streamChat,
   saveDashboardTable,
   clearChatHistory,
+  deleteChatMessage,
   streamGenerateReport,
   streamDbSummary,
   streamDbQuestions,
@@ -289,6 +290,8 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const [bookmarkRefreshTrigger, setBookmarkRefreshTrigger] = useState(0);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [sqlPopupMessage, setSqlPopupMessage] = useState<Message | null>(null);
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
+  const [isDeletingMessage, setIsDeletingMessage] = useState(false);
   const lastUserPromptRef = useRef<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatPanelRef = useRef<HTMLDivElement>(null);
@@ -587,6 +590,32 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     });
   };
 
+  const handleDeleteMessage = async (message: Message) => {
+    // Find the paired message (user question for assistant, or assistant for user)
+    const idx = messages.findIndex((m) => m.id === message.id);
+    let pairedId: string | null = null;
+    if (message.role === "assistant" && idx > 0) {
+      for (let i = idx - 1; i >= 0; i--) {
+        if (messages[i].role === "user") { pairedId = messages[i].id; break; }
+      }
+    } else if (message.role === "user") {
+      for (let i = idx + 1; i < messages.length; i++) {
+        if (messages[i].role === "assistant") { pairedId = messages[i].id; break; }
+      }
+    }
+    try {
+      setIsDeletingMessage(true);
+      await deleteChatMessage(message.id);
+      setMessages((prev) => prev.filter((m) => m.id !== message.id && m.id !== pairedId));
+      setDeleteConfirmMessage(null);
+      toast({ title: "Deleted", description: "Message removed." });
+    } catch (err) {
+      toast({ title: "Delete failed", description: String(err), variant: "destructive" });
+    } finally {
+      setIsDeletingMessage(false);
+    }
+  };
+
   // Derive the most relevant prompt for a given assistant message
   const getPromptForMessage = (msg: Message): string => {
     let prompt = lastUserPromptRef.current;
@@ -746,6 +775,17 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                                 SQL
                               </Button>
                             )}
+                            {message.role === "assistant" && message.id !== "welcome" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteConfirmMessage(message)}
+                                aria-label="Delete message"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </>
                       )}
@@ -837,6 +877,36 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setSqlPopupMessage(null)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation modal */}
+      <Dialog open={!!deleteConfirmMessage} onOpenChange={(open) => !open && !isDeletingMessage && setDeleteConfirmMessage(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete this response?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will delete both the assistant response and the related user question.
+          </p>
+          <DialogFooter>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDeleteConfirmMessage(null)}
+              disabled={isDeletingMessage}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => deleteConfirmMessage && handleDeleteMessage(deleteConfirmMessage)}
+              disabled={isDeletingMessage}
+            >
+              {isDeletingMessage ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

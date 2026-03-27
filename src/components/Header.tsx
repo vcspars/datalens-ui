@@ -51,6 +51,19 @@ export default function Header() {
       .toUpperCase()
       .slice(0, 2);
 
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case "executive":
+        return { label: "Executive", color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" };
+      case "sales":
+        return { label: "Sales", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" };
+      case "operations":
+        return { label: "Operations", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" };
+      default:
+        return { label: role, color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" };
+    }
+  };
+
   return (
     <header className="h-16 flex items-center overflow-visible px-4 sm:px-6 bg-background border-b border-border sticky top-0 z-50">
       {/* Logo - larger than header so it’s prominent; overflows with overflow-visible */}
@@ -111,6 +124,12 @@ export default function Header() {
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
 
+        {user && user.role && (
+          <span className={`hidden sm:inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getRoleBadge(user.role).color}`}>
+            {getRoleBadge(user.role).label}
+          </span>
+        )}
+
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -127,6 +146,11 @@ export default function Header() {
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium">{user.full_name}</p>
                   <p className="text-xs text-muted-foreground">{user.email}</p>
+                  {user.role && (
+                    <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium mt-0.5 ${getRoleBadge(user.role).color}`}>
+                      {getRoleBadge(user.role).label}
+                    </span>
+                  )}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

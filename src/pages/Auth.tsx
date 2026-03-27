@@ -9,12 +9,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { login, signup } from "@/lib/api";
 
+const ROLE_OPTIONS = [
+  { value: "executive" as const, label: "Executive / Management", description: "Full access to all modules" },
+  { value: "sales" as const, label: "Sales Team", description: "Sales, customers, inventory, pricing, backorders" },
+  { value: "operations" as const, label: "Operations / Warehouse", description: "Inventory monitoring & backorders only" },
+];
+
 export default function Auth() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirm, setShowSignupConfirm] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<"executive" | "sales" | "operations">("executive");
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -59,7 +66,7 @@ export default function Auth() {
     }
 
     try {
-      await signup({ email, password, full_name, confirm_password });
+      await signup({ email, password, full_name, confirm_password, role: selectedRole });
       toast.success("Account created successfully!");
       console.log("[Auth] Signup successful, redirecting to /chat");
       navigate('/chat');
@@ -208,6 +215,34 @@ export default function Auth() {
                       >
                         {showSignupConfirm ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                       </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <div className="grid gap-2">
+                      {ROLE_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                            selectedRole === opt.value
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-muted/40"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="signup-role"
+                            value={opt.value}
+                            checked={selectedRole === opt.value}
+                            onChange={() => setSelectedRole(opt.value)}
+                            className="accent-primary"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{opt.label}</span>
+                            <span className="text-xs text-muted-foreground">{opt.description}</span>
+                          </div>
+                        </label>
+                      ))}
                     </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
