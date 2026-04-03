@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { login, signup } from "@/lib/api";
 
@@ -91,168 +91,83 @@ export default function Auth() {
           </p>
         </div>
 
+        {/* Sign Up tab hidden for now — restore the <Tabs> block below to re-enable */}
+        <Tabs defaultValue="login" className="w-full -mt-1 sm:-mt-2">
+          <TabsList className="flex w-auto mx-auto bg-transparent shadow-none">
+            <TabsTrigger value="login" className="px-20">Login</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Card className="overflow-hidden w-full">
+          <CardHeader className="px-3 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
+            <CardTitle className="text-lg sm:text-xl">Welcome back</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Enter your credentials to access your account</CardDescription>
+          </CardHeader>
+          <CardContent className="px-3 pb-4 sm:px-6 sm:pb-6">
+            <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email</Label>
+                <Input
+                  id="login-email"
+                  name="login-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    name="login-password"
+                    type={showLoginPassword ? "text" : "password"}
+                    required
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowLoginPassword((v) => !v)}
+                    aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                  >
+                    {showLoginPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
+                </div>
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Logging in..." : "Login"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/*
+        =====================================================================
+        SIGN UP TAB — commented out, restore to re-enable registration
+        =====================================================================
         <Tabs defaultValue="login" className="w-full -mt-1 sm:-mt-2">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
-
           <TabsContent value="login">
-            <Card className="overflow-hidden">
-              <CardHeader className="px-3 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl">Welcome back</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Enter your credentials to access your account</CardDescription>
-              </CardHeader>
-              <CardContent className="px-3 pb-4 sm:px-6 sm:pb-6">
-                <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      name="login-email"
-                      type="email"
-                      placeholder="name@example.com"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="login-password"
-                        name="login-password"
-                        type={showLoginPassword ? "text" : "password"}
-                        required
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowLoginPassword((v) => !v)}
-                        aria-label={showLoginPassword ? "Hide password" : "Show password"}
-                      >
-                        {showLoginPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Logging in..." : "Login"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+            ... login card ...
           </TabsContent>
-
           <TabsContent value="signup">
             <Card className="overflow-hidden">
-              <CardHeader className="px-3 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl">Create an account</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Enter your information to get started</CardDescription>
-              </CardHeader>
-              <CardContent className="px-3 pb-4 sm:px-6 sm:pb-6">
-                <form onSubmit={handleSignup} className="space-y-3 sm:space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      name="signup-name"
-                      type="text"
-                      placeholder="John Doe"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      name="signup-email"
-                      type="email"
-                      placeholder="name@example.com"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-password"
-                        name="signup-password"
-                        type={showSignupPassword ? "text" : "password"}
-                        required
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowSignupPassword((v) => !v)}
-                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
-                      >
-                        {showSignupPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm">Confirm Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-confirm"
-                        name="signup-confirm"
-                        type={showSignupConfirm ? "text" : "password"}
-                        required
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowSignupConfirm((v) => !v)}
-                        aria-label={showSignupConfirm ? "Hide password" : "Show password"}
-                      >
-                        {showSignupConfirm ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Role</Label>
-                    <div className="grid gap-2">
-                      {ROLE_OPTIONS.map((opt) => (
-                        <label
-                          key={opt.value}
-                          className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                            selectedRole === opt.value
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:bg-muted/40"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="signup-role"
-                            value={opt.value}
-                            checked={selectedRole === opt.value}
-                            onChange={() => setSelectedRole(opt.value)}
-                            className="accent-primary"
-                          />
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">{opt.label}</span>
-                            <span className="text-xs text-muted-foreground">{opt.description}</span>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Creating account..." : "Sign Up"}
-                  </Button>
+              <CardHeader ...>Create an account</CardHeader>
+              <CardContent>
+                <form onSubmit={handleSignup}>
+                  Full Name / Email / Password / Confirm Password / Role selector / Sign Up button
                 </form>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+        =====================================================================
+        */}
 
         <p className="text-center text-xs sm:text-sm text-muted-foreground mt-4 sm:mt-6">
           Powered by <span className="text-primary font-medium">SPARS</span>
