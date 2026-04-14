@@ -791,7 +791,6 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                               {copiedMessageId === message.id ? "Copied" : "Copy"}
                             </Button>
                           ) : null}
-                          {/* SQL button hidden for now
                           {message.sql_query && (
                             <Button
                               size="sm"
@@ -803,7 +802,6 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                               SQL
                             </Button>
                           )}
-                          */}
                           {message.role === "assistant" && message.id !== "welcome" && (
                             <Button
                               size="sm"
