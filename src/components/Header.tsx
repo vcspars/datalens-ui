@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, HelpCircle, LogOut, Sun, Moon, ChevronDown, User, MessageSquare } from "lucide-react";
+import { LayoutDashboard, HelpCircle, LogOut, Sun, Moon, ChevronDown, User, MessageSquare, BarChart2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,22 +14,37 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getCurrentUser, logout, UserResponse } from "@/lib/api";
 
+const USER_CACHE_KEY = "spars_user_cache";
+
+function getCachedUser(): UserResponse | null {
+  try {
+    const raw = sessionStorage.getItem(USER_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as UserResponse) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, setTheme } = useTheme();
   const pathname = location.pathname;
-  const [user, setUser] = useState<UserResponse | null>(null);
+
+  // Initialise from cache so nav buttons never flash-disappear between pages
+  const [user, setUser] = useState<UserResponse | null>(getCachedUser);
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
         console.log("[Header] Fetching current user...");
         const userData = await getCurrentUser();
+        sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
         setUser(userData);
         console.log("[Header] User loaded:", userData.full_name);
       } catch (error) {
         console.log("[Header] User not logged in or token expired");
+        sessionStorage.removeItem(USER_CACHE_KEY);
         setUser(null);
       }
     };
@@ -39,6 +54,7 @@ export default function Header() {
   const handleLogout = () => {
     console.log("[Header] Logging out user");
     logout();
+    sessionStorage.removeItem(USER_CACHE_KEY);
     setUser(null);
     navigate("/auth");
   };
@@ -90,6 +106,20 @@ export default function Header() {
           <MessageSquare className="h-4 w-4" />
           <span className="hidden sm:inline">Chat with Database</span>
         </Button>
+
+        {user?.role === "executive" && (
+          <Button
+            variant="ghost"
+            className={`gap-2 text-sm sm:text-base px-2 sm:px-4 ${pathname === "/executive-dashboard" ? "text-primary" : ""}`}
+            onClick={() => {
+              console.log("[Header] Navigate to /executive-dashboard");
+              navigate("/executive-dashboard");
+            }}
+          >
+            <BarChart2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Executive Dashboard</span>
+          </Button>
+        )}
 
         <Button
           variant="ghost"

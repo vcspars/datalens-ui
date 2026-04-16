@@ -313,9 +313,10 @@ export default function MyDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
       <Header />
 
+      <div className="flex-1 overflow-y-auto">
       <div className="container mx-auto p-6 max-w-7xl">
         {/* Page header */}
         <div className="flex items-center justify-between mb-6">
@@ -613,6 +614,7 @@ export default function MyDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+      </div>{/* end scroll wrapper */}
 
       {/* View Report Modal */}
       <ViewReportModal

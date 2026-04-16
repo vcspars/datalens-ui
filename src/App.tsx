@@ -10,6 +10,7 @@ import Blog from "./pages/Blog";
 import Contact from "./pages/Contact";
 import Privacy from "./pages/Privacy";
 import ChatWithDatabase from "./pages/ChatWithDatabase";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import MyDashboard from "./pages/MyDashboard";
 import Help from "./pages/Help";
 import Auth from "./pages/Auth";
@@ -34,6 +35,7 @@ const App = () => (
 
             {/* Primary app routes */}
             <Route path="/chat" element={<ChatWithDatabase />} />
+            <Route path="/executive-dashboard" element={<ExecutiveDashboard />} />
             <Route path="/my-dashboard" element={<MyDashboard />} />
 
             {/* Redirect old dataset/dashboard routes */}

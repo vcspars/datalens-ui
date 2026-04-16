@@ -99,13 +99,13 @@ export default function Help() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
       <Header />
-      
-      <div className="flex max-w-7xl mx-auto px-6">
-        {/* Left: sticky sidebar */}
-        <aside className="hidden lg:block w-64 flex-shrink-0 border-r border-border bg-background/95">
-          <div className="sticky top-16 py-6 pl-0 pr-3 overflow-y-auto max-h-[calc(100vh-4rem)]">
+
+      <div className="flex flex-1 min-h-0 w-full max-w-7xl mx-auto px-6">
+        {/* Left: independent-scroll sidebar */}
+        <aside className="hidden lg:flex lg:flex-col w-64 flex-shrink-0 border-r border-border bg-background/95 overflow-y-auto">
+          <div className="py-6 pl-0 pr-3">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen className="h-5 w-5 text-primary" />
               <span className="font-semibold text-foreground">User Manual</span>
@@ -141,7 +141,7 @@ export default function Help() {
         </aside>
 
         {/* Right: doc content */}
-        <main className="flex-1 min-w-0 py-6 px-6 lg:px-10 pb-16" id="help-doc-content">
+        <main className="flex-1 min-w-0 overflow-y-auto py-6 px-6 lg:px-10 pb-16" id="help-doc-content">
           <div className="prose max-w-none text-foreground prose-p:text-sm prose-li:text-sm prose-p:leading-relaxed prose-li:leading-relaxed">
             <SectionHeading id="overview">Overview</SectionHeading>
             <p className="text-muted-foreground leading-relaxed">
