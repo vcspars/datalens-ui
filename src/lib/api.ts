@@ -531,6 +531,35 @@ export const streamGenerateReport = async (payload: {
 };
 
 // ---------------------------------------------------------------------------
+// Direct Query Tester — POST /test/direct-query
+// ---------------------------------------------------------------------------
+
+export interface DirectQueryRequest {
+  question: string;
+  role: "executive" | "sales" | "operations";
+}
+
+export interface DirectQueryResponse {
+  question: string;
+  generated_sql: string;
+  columns: string[];
+  rows: unknown[][];
+  row_count: number;
+  elapsed_ms: number;
+  error?: string | null;
+}
+
+export const runDirectQuery = async (
+  data: DirectQueryRequest
+): Promise<DirectQueryResponse> => {
+  console.log("[API] runDirectQuery role=", data.role, "question=", data.question.slice(0, 80));
+  return apiRequest<DirectQueryResponse>("/test/direct-query", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+};
+
+// ---------------------------------------------------------------------------
 // Legacy dataset helpers kept for backward compat (upload routes, etc.)
 // ---------------------------------------------------------------------------
 export interface DatasetResponse {

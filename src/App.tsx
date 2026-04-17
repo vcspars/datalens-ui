@@ -14,6 +14,7 @@ import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import MyDashboard from "./pages/MyDashboard";
 import Help from "./pages/Help";
 import Auth from "./pages/Auth";
+import DirectQueryTester from "./pages/DirectQueryTester";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/dashboard" element={<Navigate to="/chat" replace />} />
             <Route path="/dashboard/:type/:id" element={<Navigate to="/chat" replace />} />
 
+            <Route path="/query-tester" element={<DirectQueryTester />} />
             <Route path="/help" element={<Help />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
