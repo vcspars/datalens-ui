@@ -5,6 +5,8 @@ import {
   Bar,
   LineChart,
   Line,
+  ComposedChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,6 +14,7 @@ import {
   ResponsiveContainer,
   Legend,
   Cell,
+  ReferenceLine,
 } from "recharts";
 import {
   Loader2,
@@ -25,6 +28,8 @@ import {
   AlertTriangle,
   X,
   Wrench,
+  Info,
+  Package,
 } from "lucide-react";
 import { getCurrentUser, UserResponse } from "@/lib/api";
 import Header from "@/components/Header";
@@ -64,13 +69,6 @@ const MONTHS = [
   { value: "12", label: "December"  },
 ];
 
-const QUARTERS = [
-  { value: "Q1", label: "Q1  (Jan – Mar)" },
-  { value: "Q2", label: "Q2  (Apr – Jun)" },
-  { value: "Q3", label: "Q3  (Jul – Sep)" },
-  { value: "Q4", label: "Q4  (Oct – Dec)" },
-];
-
 // ─── Dummy chart data ─────────────────────────────────────────────────────────
 const REVENUE_BY_YEAR = [
   { year: "2018",    revenue: 29.70 },
@@ -100,11 +98,13 @@ function getMonthLabel(m: string) {
   return MONTHS.find((x) => x.value === m)?.label ?? "";
 }
 
-function buildSubtitle(year: string, month: string, quarter: string) {
-  const ml = getMonthLabel(month);
-  if (month)   return { period: `${ml} ${year} Monthly Report`,  range: `Jan – ${ml.slice(0, 3)} ${year}  +  Full Year ${+year - 1}` };
-  if (quarter) return { period: `${quarter} ${year} Quarterly Report`, range: `${quarter} ${year}  +  Full Year ${+year - 1}` };
-  return          { period: `${year} Annual Report`,             range: `Full Year ${year}` };
+function buildSubtitle(year: string, month: string, compYear: string, compMonth: string) {
+  const ml      = getMonthLabel(month);
+  const compMl  = getMonthLabel(compMonth);
+  const primary = ml     ? `${ml.slice(0, 3)} ${year}`         : `Full Year ${year}`;
+  const comp    = compMl ? `${compMl.slice(0, 3)} ${compYear}` : `Full Year ${compYear}`;
+  if (month) return { period: `${ml} ${year} Monthly Report`, range: `${primary}  vs  ${comp}` };
+  return       { period: `${year} Annual Report`,             range: `${primary}  vs  ${comp}` };
 }
 
 function fmtDollars(v: number) {
@@ -317,6 +317,25 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Data-anchor badge — declares each section's time context ────────────────
+type DataAnchor = "filter-driven" | "reference" | "live" | "forecast";
+
+const DATA_ANCHOR_CONFIG: Record<DataAnchor, { label: string; cn: string }> = {
+  "filter-driven": { label: "Filter-Driven",  cn: "bg-blue-50 text-blue-600 border-blue-200" },
+  "reference":     { label: "Reference Data", cn: "bg-gray-100 text-gray-500 border-gray-300" },
+  "live":          { label: "Live",           cn: "bg-emerald-50 text-emerald-600 border-emerald-200" },
+  "forecast":      { label: "Forecast",       cn: "bg-violet-50 text-violet-600 border-violet-200" },
+};
+
+function DataBadge({ type }: { type: DataAnchor }) {
+  const { label, cn } = DATA_ANCHOR_CONFIG[type];
+  return (
+    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border ml-1.5 align-middle ${cn}`}>
+      {label}
+    </span>
+  );
+}
+
 // ─── Full accounts table data ─────────────────────────────────────────────────
 interface FullAccountRow {
   rank:   number;
@@ -352,7 +371,6 @@ const ALL_ACCOUNTS: FullAccountRow[] = [
 ];
 
 // ─── Historical revenue by key account ───────────────────────────────────────
-const HIST_YEARS = ["2018","2019","2020","2021","2022","2023","2024","2025"];
 const HIST_DATA = [
   { year:"2018", Wayfair:5200, WilliamsSonoma:1900, Overstock:1250, RugsDirect:870,  Quince:0    },
   { year:"2019", Wayfair:5400, WilliamsSonoma:2180, Overstock:1450, RugsDirect:980,  Quince:0    },
@@ -380,14 +398,33 @@ const LINE_LABELS: Record<string, string> = {
   Quince:         "Quince",
 };
 
-// ─── Accounts tab content ─────────────────────────────────────────────────────
-interface AccountsContentProps { appliedYear: string; appliedMonth: string }
+// ─── Quince concentration risk data ──────────────────────────────────────────
+// Shows Quince as a % of total company revenue over time — a key risk metric
+const QUINCE_CONCENTRATION = [
+  { year: "2018", total: 29.70, quince: 0.00, pct: 0.0  },
+  { year: "2019", total: 30.12, quince: 0.00, pct: 0.0  },
+  { year: "2020", total: 27.84, quince: 0.00, pct: 0.0  },
+  { year: "2021", total: 28.53, quince: 0.00, pct: 0.0  },
+  { year: "2022", total: 26.97, quince: 0.00, pct: 0.0  },
+  { year: "2023", total: 26.41, quince: 0.00, pct: 0.0  },
+  { year: "2024", total: 27.18, quince: 0.05, pct: 0.2  },
+  { year: "2025", total: 27.63, quince: 3.17, pct: 11.5 },
+  { year: "2026P", total: 29.00, quince: 6.50, pct: 22.4 },
+];
 
-function AccountsContent({ appliedYear, appliedMonth }: AccountsContentProps) {
-  const ml   = getMonthLabel(appliedMonth);
-  const prev = +appliedYear - 1;
-  const periodStr = ml ? `${ml} ${appliedYear}` : appliedYear;
-  const prevStr   = ml ? `${ml} ${prev}` : String(prev);
+// ─── Accounts tab content ─────────────────────────────────────────────────────
+interface AccountsContentProps {
+  appliedYear:      string;
+  appliedMonth:     string;
+  appliedCompYear:  string;
+  appliedCompMonth: string;
+}
+
+function AccountsContent({ appliedYear, appliedMonth, appliedCompYear, appliedCompMonth }: AccountsContentProps) {
+  const ml        = getMonthLabel(appliedMonth);
+  const compMl    = getMonthLabel(appliedCompMonth);
+  const periodStr = ml     ? `${ml} ${appliedYear}`          : appliedYear;
+  const prevStr   = compMl ? `${compMl} ${appliedCompYear}`  : appliedCompYear;
 
   const yoyPctStyle = (up: boolean | "new" | "flat") => {
     if (up === "new")  return "bg-blue-100 text-blue-700 border border-blue-200";
@@ -397,21 +434,6 @@ function AccountsContent({ appliedYear, appliedMonth }: AccountsContentProps) {
       : "bg-red-100 text-red-700 border border-red-200";
   };
 
-  const LineTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="bg-white border border-border rounded-lg shadow-md px-4 py-3 min-w-[190px]">
-        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">{label}</p>
-        {payload.map((p: any) => (
-          <div key={p.dataKey} className="flex justify-between gap-4 text-xs mt-1">
-            <span style={{ color: p.color }} className="font-medium">{LINE_LABELS[p.dataKey]}</span>
-            <span className="font-bold text-foreground">${p.value.toLocaleString()}K</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div className="p-6 lg:p-8 space-y-10">
 
@@ -419,14 +441,25 @@ function AccountsContent({ appliedYear, appliedMonth }: AccountsContentProps) {
       <div>
         <SectionHeading>
           All Accounts — {periodStr} Performance
+          <DataBadge type="filter-driven" />
         </SectionHeading>
         <Card className="border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr style={{ backgroundColor: PRIMARY_DARK }}>
-                  {["#","Account",`${periodStr} Revenue`,`${prevStr} Revenue`,"YOY Change $","YOY %",`${periodStr} Units`,"Status","Sales Action"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap">
+                  {([
+                    ["#",                    "text-left"],
+                    ["Account",              "text-left"],
+                    [`${periodStr} Revenue`, "text-right"],
+                    [`${prevStr} Revenue`,   "text-right"],
+                    ["YOY Change $",         "text-right"],
+                    ["YOY %",                "text-right"],
+                    [`${periodStr} Units`,   "text-right"],
+                    ["Status",               "text-left"],
+                    ["Sales Action",         "text-left"],
+                  ] as [string, string][]).map(([h, align]) => (
+                    <th key={h} className={`px-4 py-3 ${align} text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap`}>
                       {h}
                     </th>
                   ))}
@@ -445,17 +478,17 @@ function AccountsContent({ appliedYear, appliedMonth }: AccountsContentProps) {
                         {row.isStar && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-foreground font-medium">{row.rev26}</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{row.rev25}</td>
-                    <td className={`px-4 py-3 font-mono font-medium ${row.yoyUp === true ? "text-emerald-700" : row.yoyUp === false ? "text-red-600" : "text-blue-600"}`}>
+                    <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{row.rev26}</td>
+                    <td className="px-4 py-3 text-right font-mono text-muted-foreground">{row.rev25}</td>
+                    <td className={`px-4 py-3 text-right font-mono font-medium ${row.yoyUp === true ? "text-emerald-700" : row.yoyUp === false ? "text-red-600" : "text-blue-600"}`}>
                       {row.yoyDol}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-right">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold ${yoyPctStyle(row.yoyUp)}`}>
                         {row.yoyPct}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-foreground font-mono text-xs">{row.units26.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-foreground font-mono text-xs">{row.units26.toLocaleString()}</td>
                     <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
                     <td className={`px-4 py-3 text-xs whitespace-nowrap ${row.action.startsWith("URGENT") ? "font-semibold text-red-600" : "text-muted-foreground"}`}>
                       {row.action}
@@ -465,57 +498,6 @@ function AccountsContent({ appliedYear, appliedMonth }: AccountsContentProps) {
               </tbody>
             </table>
           </div>
-        </Card>
-      </div>
-
-      {/* ── Historical revenue line chart ── */}
-      <div>
-        <SectionHeading>Historical Revenue by Key Account (Full Year)</SectionHeading>
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-0 px-6 pt-5">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Top 5 Accounts — Annual Revenue History
-              <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-5 pt-4">
-            <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={HIST_DATA} margin={{ top: 8, right: 24, left: 8, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" vertical={false} />
-                <XAxis
-                  dataKey="year"
-                  tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tickFormatter={(v) => `$${v.toLocaleString()}K`}
-                  tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={72}
-                />
-                <Tooltip content={<LineTooltip />} />
-                <Legend
-                  iconType="square"
-                  iconSize={10}
-                  wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }}
-                  formatter={(key) => LINE_LABELS[key as string] ?? key}
-                />
-                {Object.keys(LINE_COLORS).map((key) => (
-                  <Line
-                    key={key}
-                    type="monotone"
-                    dataKey={key}
-                    stroke={LINE_COLORS[key as keyof typeof LINE_COLORS]}
-                    strokeWidth={key === "Quince" ? 2.5 : 1.8}
-                    dot={{ r: 3, strokeWidth: 0 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
         </Card>
       </div>
 
@@ -592,13 +574,17 @@ const QUINCE_SEASONAL = [
 interface ForecastContentProps { appliedYear: string; appliedMonth: string }
 
 function ForecastContent({ appliedYear }: ForecastContentProps) {
+  const currentYear  = String(new Date().getFullYear());
+  const currentMonth = new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
+  const isHistorical = appliedYear !== currentYear;
+
   const forecastKpis: KpiCardProps[] = [
     {
-      label:     `${appliedYear} Annualized Pace`,
+      label:     `${currentYear} Annualized Pace`,
       value:     "~$29M",
       trend:     "Based on Jan+Feb run rate",
       trendType: "up",
-      prevLabel: `${+appliedYear - 1} Full Year`,
+      prevLabel: `${+currentYear - 1} Full Year`,
       prevValue: "$27.63M",
     },
     {
@@ -650,21 +636,63 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
   return (
     <div className="p-6 lg:p-8 space-y-10">
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-5 gap-y-6">
-        {forecastKpis.map((k) => <KpiCard key={k.label} {...k} />)}
+      {/* ── Forecast decoupling notice — always shown ── */}
+      <div className="flex items-start gap-3 rounded-lg border border-violet-200 bg-violet-50 px-5 py-4">
+        <Info className="h-5 w-5 text-violet-500 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-violet-800">
+            Forecast Data — Based on Current Actuals ({currentMonth})
+          </p>
+          <p className="text-xs text-violet-700 mt-1 leading-relaxed">
+            All projections and KPIs on this tab reflect <strong>today's actuals and run rates</strong>,
+            not the period selected in the filter bar above.
+            {isHistorical && (
+              <> You have selected a historical period ({appliedYear}) — the forecast numbers below
+              are <em>not</em> historical projections; they are the current forward-looking view.</>
+            )}{" "}
+            The filter bar period is irrelevant to this tab. Forecasts are versioned as of <strong>{currentMonth}</strong>.
+          </p>
+        </div>
+        <DataBadge type="forecast" />
       </div>
 
-      {/* Account Forecasts table */}
+      {/* ── KPI cards ── */}
       <div>
-        <SectionHeading>Account Forecasts — {appliedYear} Full Year Projections</SectionHeading>
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Current Outlook
+          </p>
+          <DataBadge type="forecast" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-5 gap-y-6">
+          {forecastKpis.map((k) => <KpiCard key={k.label} {...k} />)}
+        </div>
+      </div>
+
+      {/* ── Account Forecasts table ── */}
+      <div>
+        <SectionHeading>
+          Account Forecasts — {currentYear} Full Year Projections
+          <DataBadge type="forecast" />
+        </SectionHeading>
+        <p className="text-xs text-muted-foreground -mt-3 mb-4">
+          Projections as of {currentMonth}. Base case = conservative; upside case = if growth momentum holds.
+        </p>
         <Card className="border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr style={{ backgroundColor: PRIMARY_DARK }}>
-                  {["Account","2025 Full Year",`${appliedYear} Base Forecast`,`${appliedYear} Upside Case`,"Monthly Rate (Feb)","Priority","Key Risk / Driver"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap">
+                  {([
+                    ["Account",                       "text-left"],
+                    ["2025 Full Year",                 "text-right"],
+                    [`${currentYear} Base Forecast`,   "text-right"],
+                    [`${currentYear} Upside Case`,     "text-right"],
+                    ["Monthly Rate (Feb)",             "text-right"],
+                    ["Priority",                       "text-left"],
+                    ["Key Risk / Driver",              "text-left"],
+                  ] as [string, string][]).map(([h, align]) => (
+                    <th key={h} className={`px-4 py-3 ${align} text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap`}>
                       {h}
                     </th>
                   ))}
@@ -677,10 +705,10 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
                     className={`border-b border-border last:border-0 hover:bg-primary/[0.03] transition-colors ${i % 2 === 1 ? "bg-muted/30" : ""}`}
                   >
                     <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">{row.account}</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{row.fy2025}</td>
-                    <td className="px-4 py-3 font-mono font-semibold text-foreground">{row.base2026}</td>
-                    <td className="px-4 py-3 font-mono font-bold" style={{ color: PRIMARY }}>{row.upside2026}</td>
-                    <td className="px-4 py-3 font-mono text-foreground">{row.monthly}</td>
+                    <td className="px-4 py-3 text-right font-mono text-muted-foreground">{row.fy2025}</td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{row.base2026}</td>
+                    <td className="px-4 py-3 text-right font-mono font-bold" style={{ color: PRIMARY }}>{row.upside2026}</td>
+                    <td className="px-4 py-3 text-right font-mono text-foreground">{row.monthly}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold whitespace-nowrap ${PRIORITY_STYLE[row.priority]}`}>
                         {row.priority}
@@ -695,15 +723,26 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
         </Card>
       </div>
 
-      {/* Quince Monthly Revenue Trajectory */}
+      {/* ── Quince Monthly Revenue Trajectory ── */}
       <div>
-        <SectionHeading>Quince Monthly Revenue Trajectory</SectionHeading>
+        <SectionHeading>
+          Quince Monthly Revenue Trajectory
+          <DataBadge type="live" />
+        </SectionHeading>
         <Card className="border border-border shadow-sm">
           <CardHeader className="pb-0 px-6 pt-5">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Quince Revenue Per Month — 2025 to 2026
-              <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
-            </CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Quince Revenue Per Month — 2025 to {currentYear}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
+                </CardTitle>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Dark bars = {currentYear} · Light bars = 2025. Always shows rolling 14 months to today.
+                </p>
+              </div>
+              <DataBadge type="live" />
+            </div>
           </CardHeader>
           <CardContent className="px-4 pb-5 pt-4">
             <ResponsiveContainer width="100%" height={300}>
@@ -738,15 +777,26 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
         </Card>
       </div>
 
-      {/* Seasonal Planning */}
+      {/* ── Seasonal Planning ── */}
       <div>
-        <SectionHeading>Seasonal Planning — When Revenue Happens</SectionHeading>
+        <SectionHeading>
+          Seasonal Planning — When Revenue Happens
+          <DataBadge type="reference" />
+        </SectionHeading>
         <Card className="border border-border shadow-sm">
           <CardHeader className="pb-0 px-6 pt-5">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Quince Revenue % by Month (2025)
-              <span className="ml-2 text-xs font-normal text-muted-foreground">— Peak Season is Jul–Nov</span>
-            </CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Quince Revenue % by Month — 2025 Seasonal Pattern
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">Peak Season Jul–Nov</span>
+                </CardTitle>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Based on most recent full year (2025). This is a structural benchmark — not affected by filters.
+                </p>
+              </div>
+              <DataBadge type="reference" />
+            </div>
           </CardHeader>
           <CardContent className="px-4 pb-3 pt-4">
             <ResponsiveContainer width="100%" height={260}>
@@ -916,18 +966,26 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
   return (
     <div className="p-6 lg:p-8 space-y-10">
 
-      {/* ── Section 1: Top Collections ── */}
+      {/* ── Section 1: Top Collections — filter-driven ── */}
       <div>
-        <SectionHeading>Top Collections — {periodStr}</SectionHeading>
+        <SectionHeading>
+          Top Collections — {periodStr}
+          <DataBadge type="filter-driven" />
+        </SectionHeading>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* Horizontal bar chart */}
           <Card className="border border-border shadow-sm">
             <CardHeader className="pb-0 px-6 pt-5">
-              <CardTitle className="text-sm font-semibold text-foreground">
-                Top 12 Collections by Revenue
-                <span className="ml-2 text-xs font-normal text-muted-foreground">— {periodStr}</span>
-              </CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold text-foreground">
+                    Top 12 Collections by Revenue
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">— {periodStr}</span>
+                  </CardTitle>
+                </div>
+                <DataBadge type="filter-driven" />
+              </div>
             </CardHeader>
             <CardContent className="px-4 pb-5 pt-4">
               <ResponsiveContainer width="100%" height={340}>
@@ -962,7 +1020,12 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
           {/* Collection ranking table */}
           <Card className="border border-border shadow-sm">
             <CardHeader className="pb-0 px-6 pt-5">
-              <CardTitle className="text-sm font-semibold text-foreground">Collection Ranking</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Collection Ranking — {periodStr}
+                </CardTitle>
+                <DataBadge type="filter-driven" />
+              </div>
             </CardHeader>
             <CardContent className="p-0 pb-2">
               <table className="w-full text-sm">
@@ -997,15 +1060,250 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
         </div>
       </div>
 
-      {/* ── Section 2: Best-Selling Sizes ── */}
+    </div>
+  );
+}
+
+// ─── Reference Data content ────────────────────────────────────────────────────
+function ReferenceDataContent() {
+  const LineTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-white border border-border rounded-lg shadow-md px-4 py-3 min-w-[190px]">
+        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">{label}</p>
+        {payload.map((p: any) => (
+          <div key={p.dataKey} className="flex justify-between gap-4 text-xs mt-1">
+            <span style={{ color: p.color }} className="font-medium">{LINE_LABELS[p.dataKey]}</span>
+            <span className="font-bold text-foreground">${p.value.toLocaleString()}K</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const ConcentrationTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const d = QUINCE_CONCENTRATION.find((r) => r.year === label);
+    return (
+      <div className="bg-white border border-border rounded-lg shadow-md px-4 py-3 min-w-[200px]">
+        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+          {label === "2026P" ? "2026 (Projected)" : label}
+        </p>
+        <div className="flex justify-between gap-4 text-xs">
+          <span className="text-muted-foreground">Quince % of Revenue</span>
+          <span className="font-bold" style={{ color: payload[0]?.value >= 20 ? "#dc2626" : PRIMARY_DARK }}>
+            {payload[0]?.value.toFixed(1)}%
+          </span>
+        </div>
+        {d && (
+          <>
+            <div className="flex justify-between gap-4 text-xs mt-1">
+              <span className="text-muted-foreground">Quince Revenue</span>
+              <span className="font-semibold text-foreground">${d.quince.toFixed(2)}M</span>
+            </div>
+            <div className="flex justify-between gap-4 text-xs mt-1">
+              <span className="text-muted-foreground">Total Revenue</span>
+              <span className="font-semibold text-foreground">${d.total.toFixed(2)}M</span>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const QuinceBarTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-white border border-border rounded-lg shadow-md px-4 py-3">
+        <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">{label}</p>
+        <p className="text-sm font-bold text-foreground">
+          2025 Quince Revenue ($K): {payload[0].value}
+        </p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-6 lg:p-8 space-y-10">
+
+      {/* ── Info banner ── */}
+      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-5 py-3">
+        <Info className="h-4 w-4 text-slate-500 shrink-0" />
+        <p className="text-xs text-slate-600 flex-1">
+          <strong>Reference Data</strong> — All sections on this tab show full historical benchmarks and
+          structural product-mix data. They are <strong>completely independent of the period filters</strong>{" "}
+          above and do not change when you select different year/month combinations.
+        </p>
+        <DataBadge type="reference" />
+      </div>
+
+      {/* ── Revenue by Year ── */}
       <div>
-        <SectionHeading>Best-Selling Sizes (Based on Quince 2025 Data)</SectionHeading>
+        <SectionHeading>
+          Annual Revenue History — Full Company
+          <DataBadge type="reference" />
+        </SectionHeading>
+        <Card className="border border-border shadow-sm">
+          <CardHeader className="pb-2 px-6 pt-5">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Revenue by Year (2018 – 2026 YTD)
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">($M)</span>
+                </CardTitle>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Full company revenue history · 2026 YTD bar shown at reduced opacity
+                </p>
+              </div>
+              <DataBadge type="reference" />
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-5">
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={REVENUE_BY_YEAR} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" vertical={false} />
+                <XAxis dataKey="year" tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `$${v.toFixed(0)}M`} tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} domain={[0, 35]} width={48} />
+                <Tooltip content={<RevenueTooltip />} cursor={{ fill: "hsl(207 69% 46% / 0.06)" }} />
+                <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={44}>
+                  {REVENUE_BY_YEAR.map((entry) => {
+                    const isYtd = entry.year.includes("YTD");
+                    return (
+                      <Cell key={entry.year} fill={isYtd ? PRIMARY_PALE : PRIMARY_DARK} fillOpacity={isYtd ? 0.55 : 0.85} />
+                    );
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Historical Revenue by Key Account ── */}
+      <div>
+        <SectionHeading>
+          Historical Revenue by Key Account — Full History
+          <DataBadge type="reference" />
+        </SectionHeading>
+        <Card className="border border-border shadow-sm">
+          <CardHeader className="pb-0 px-6 pt-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Top 5 Accounts — Annual Revenue History
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Full history 2018–2025 · Not affected by period filters.
+                </p>
+              </div>
+              <DataBadge type="reference" />
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-5 pt-4">
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={HIST_DATA} margin={{ top: 8, right: 24, left: 8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" vertical={false} />
+                <XAxis dataKey="year" tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `$${v.toLocaleString()}K`} tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} width={72} />
+                <Tooltip content={<LineTooltip />} />
+                <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }} formatter={(key) => LINE_LABELS[key as string] ?? key} />
+                {Object.keys(LINE_COLORS).map((key) => (
+                  <Line key={key} type="monotone" dataKey={key}
+                    stroke={LINE_COLORS[key as keyof typeof LINE_COLORS]}
+                    strokeWidth={key === "Quince" ? 2.5 : 1.8}
+                    dot={{ r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Quince Concentration Risk ── */}
+      <div>
+        <SectionHeading>
+          Quince Revenue Concentration Risk
+          <DataBadge type="reference" />
+        </SectionHeading>
+        <Card className="border border-border shadow-sm">
+          <CardHeader className="pb-0 px-6 pt-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Quince as % of Total Company Revenue — 2018 to 2026
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">(2026 = projected)</span>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Red dashed line marks the 20% concentration risk threshold. Exceeding this creates
+                  single-account dependency risk.
+                </p>
+              </div>
+              <DataBadge type="reference" />
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-5 pt-4">
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={QUINCE_CONCENTRATION} margin={{ top: 8, right: 24, left: 8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" vertical={false} />
+                <XAxis dataKey="year" tickFormatter={(v) => v === "2026P" ? "2026P" : v}
+                  tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }}
+                  axisLine={false} tickLine={false} domain={[0, 28]} width={44} />
+                <Tooltip content={<ConcentrationTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                <ReferenceLine y={20} stroke="#dc2626" strokeWidth={1.5} strokeDasharray="5 3"
+                  label={{ value: "20% Risk Threshold", position: "insideTopRight", fontSize: 10, fill: "#dc2626", fontWeight: 600 }} />
+                <Area type="monotone" dataKey="pct" fill={PRIMARY_PALE} fillOpacity={0.25} stroke="none" />
+                <Line type="monotone" dataKey="pct" stroke={PRIMARY_DARK} strokeWidth={2.5}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props;
+                    const isRisk = payload.pct >= 20;
+                    return (
+                      <circle key={payload.year} cx={cx} cy={cy}
+                        r={payload.year === "2026P" ? 5 : 4}
+                        fill={isRisk ? "#dc2626" : PRIMARY_DARK} stroke="white" strokeWidth={1.5} />
+                    );
+                  }}
+                  activeDot={{ r: 6 }} name="Quince % of Revenue"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+              <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700 leading-relaxed">
+                <strong>Concentration Risk:</strong> Quince grew from 0% in 2023 to a projected{" "}
+                <strong>22.4% of total revenue in 2026</strong>. At this level, any reduction in Quince
+                orders (delistings, platform changes, buyer turnover) would have an immediate and material
+                impact on full-year results. Accelerating recovery of Williams Sonoma, Target, and
+                Mackenzie Childs is the primary risk mitigation lever.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Best-Selling Sizes ── */}
+      <div>
+        <SectionHeading>
+          Best-Selling Sizes — Quince 2025 Reference Data
+          <DataBadge type="reference" />
+        </SectionHeading>
+        <p className="text-xs text-muted-foreground -mt-3 mb-4">
+          Size distribution based on Quince 2025 full-year actuals — the most recent complete year
+          available. A structural product-mix benchmark independent of period filters.
+        </p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          {/* Size revenue share — custom progress bars */}
+          {/* Size revenue share */}
           <Card className="border border-border shadow-sm">
             <CardHeader className="pb-2 px-6 pt-5">
-              <CardTitle className="text-sm font-semibold text-foreground">Revenue Share by Size</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Revenue Share by Size — Quince 2025
+                </CardTitle>
+                <DataBadge type="reference" />
+              </div>
             </CardHeader>
             <CardContent className="px-6 pb-6 space-y-5">
               {SIZE_SHARES.map((s) => (
@@ -1018,13 +1316,9 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
                     <span className="text-sm font-medium text-muted-foreground">{s.pct}% of revenue</span>
                   </div>
                   <div className="relative h-6 w-full rounded bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded flex items-center justify-start pl-2 transition-all"
-                      style={{ width: `${s.pct}%`, backgroundColor: s.pct >= 20 ? PRIMARY_DARK : PRIMARY_PALE }}
-                    >
-                      {s.pct >= 10 && (
-                        <span className="text-[11px] font-bold text-white">{s.pct}%</span>
-                      )}
+                    <div className="h-full rounded flex items-center justify-start pl-2 transition-all"
+                      style={{ width: `${s.pct}%`, backgroundColor: s.pct >= 20 ? PRIMARY_DARK : PRIMARY_PALE }}>
+                      {s.pct >= 10 && <span className="text-[11px] font-bold text-white">{s.pct}%</span>}
                     </div>
                     {s.pct < 10 && (
                       <span className="absolute left-[calc(var(--w)+6px)] top-1/2 -translate-y-1/2 text-[11px] font-bold text-foreground"
@@ -1041,16 +1335,27 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
           {/* Top SKUs table */}
           <Card className="border border-border shadow-sm">
             <CardHeader className="pb-0 px-6 pt-5">
-              <CardTitle className="text-sm font-semibold text-foreground">Top SKUs by Revenue
-                <span className="ml-2 text-xs font-normal text-muted-foreground">(Quince 2025)</span>
-              </CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold text-foreground">Top SKUs by Revenue</CardTitle>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Quince 2025 Full Year — Reference Data</p>
+                </div>
+                <DataBadge type="reference" />
+              </div>
             </CardHeader>
             <CardContent className="p-0 pb-2">
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ backgroundColor: PRIMARY_DARK }}>
-                    {["#","SKU / Design","Size","Price","2025 Units","2025 Revenue"].map((h) => (
-                      <th key={h} className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-white/75 first:pl-5 last:pr-5 whitespace-nowrap">
+                    {([
+                      ["#",            "text-left",  "pl-5 pr-2"],
+                      ["SKU / Design", "text-left",  "px-3"],
+                      ["Size",         "text-left",  "px-3"],
+                      ["Price",        "text-right", "px-3"],
+                      ["2025 Units",   "text-right", "px-3"],
+                      ["2025 Revenue", "text-right", "pr-5 pl-3"],
+                    ] as [string, string, string][]).map(([h, align, pad]) => (
+                      <th key={h} className={`${pad} py-2.5 ${align} text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap`}>
                         {h}
                       </th>
                     ))}
@@ -1062,9 +1367,9 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
                       <td className="pl-5 pr-2 py-2.5 font-bold text-muted-foreground text-xs">{row.rank}</td>
                       <td className="px-3 py-2.5 font-medium text-foreground text-xs whitespace-nowrap">{row.sku}</td>
                       <td className="px-3 py-2.5 text-foreground text-xs">{row.size}</td>
-                      <td className="px-3 py-2.5 font-mono text-foreground text-xs">{row.price}</td>
-                      <td className="px-3 py-2.5 font-mono text-foreground text-xs">{row.units25.toLocaleString()}</td>
-                      <td className="pr-5 pl-3 py-2.5 font-mono font-semibold text-foreground text-xs">{row.rev25}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-foreground text-xs">{row.price}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-foreground text-xs">{row.units25.toLocaleString()}</td>
+                      <td className="pr-5 pl-3 py-2.5 text-right font-mono font-semibold text-foreground text-xs">{row.rev25}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1074,33 +1379,33 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
         </div>
       </div>
 
-      {/* ── Section 3: Top Quince Collections — Full Year 2025 ── */}
+      {/* ── Top Quince Collections 2025 ── */}
       <div>
-        <SectionHeading>Top Quince Collections — Full Year 2025</SectionHeading>
+        <SectionHeading>
+          Top Quince Collections — Full Year 2025 (Reference)
+          <DataBadge type="reference" />
+        </SectionHeading>
+        <p className="text-xs text-muted-foreground -mt-3 mb-4">
+          Quince 2025 full-year collection breakdown — the most recent complete year available.
+        </p>
         <Card className="border border-border shadow-sm">
           <CardHeader className="pb-0 px-6 pt-5">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Quince Revenue by Collection — 2025 Full Year
-              <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
-            </CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Quince Revenue by Collection — 2025 Full Year
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
+                </CardTitle>
+              </div>
+              <DataBadge type="reference" />
+            </div>
           </CardHeader>
           <CardContent className="px-4 pb-5 pt-4">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={QUINCE_COLLECTION_BAR} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tickFormatter={(v) => `$${v}K`}
-                  tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={56}
-                />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `$${v}K`} tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} width={56} />
                 <Tooltip content={<QuinceBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
                 <Bar dataKey="rev" name="2025 Quince Revenue ($K)" fill={PRIMARY_DARK} radius={[4, 4, 0, 0]} maxBarSize={44} />
               </BarChart>
@@ -1192,14 +1497,25 @@ function WhatToOrderContent() {
         <td className="px-4 py-2.5 text-xs font-semibold text-foreground">{row.collection}</td>
         <td className="px-4 py-2.5 text-xs text-muted-foreground">{row.color}</td>
         <td className="px-4 py-2.5 text-xs text-foreground">{row.size}</td>
-        <td className="px-4 py-2.5 text-xs font-bold text-foreground">{row.pieces}</td>
-        <td className="px-4 py-2.5 text-xs font-mono font-semibold text-foreground">{row.value}</td>
+        <td className="px-4 py-2.5 text-right text-xs font-bold text-foreground">{row.pieces}</td>
+        <td className="px-4 py-2.5 text-right text-xs font-mono font-semibold text-foreground">{row.value}</td>
         <td className="px-4 py-2.5 text-xs text-muted-foreground">{row.account}</td>
       </tr>
     ));
 
   return (
     <div className="p-6 lg:p-8 space-y-10">
+
+      {/* ── Live data context banner ── */}
+      <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-3">
+        <Info className="h-4 w-4 text-emerald-600 shrink-0" />
+        <p className="text-xs text-emerald-700 flex-1">
+          <strong>Live Inventory Data</strong> — This tab reflects current stock levels and reorder
+          priorities as of today. It is <strong>not affected by the period filter</strong> above.
+          Stockout and critical alerts are operational and always current.
+        </p>
+        <DataBadge type="live" />
+      </div>
 
       {/* ── Critical alert banner ── */}
       <div className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-5 py-4">
@@ -1262,14 +1578,26 @@ function WhatToOrderContent() {
 
       {/* ── Immediate order table ── */}
       <div>
-        <SectionHeading>IMMEDIATE — Order Right Now (Out of Stock &amp; Critical)</SectionHeading>
+        <SectionHeading>
+          IMMEDIATE — Order Right Now (Out of Stock &amp; Critical)
+          <DataBadge type="live" />
+        </SectionHeading>
         <Card className="border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr style={{ backgroundColor: PRIMARY_DARK }}>
-                  {["Urgency","SKU","Collection","Color","Size","Pieces Needed","Reorder Value","Account"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap">{h}</th>
+                  {([
+                    ["Urgency",       "text-left"],
+                    ["SKU",           "text-left"],
+                    ["Collection",    "text-left"],
+                    ["Color",         "text-left"],
+                    ["Size",          "text-left"],
+                    ["Pieces Needed", "text-right"],
+                    ["Reorder Value", "text-right"],
+                    ["Account",       "text-left"],
+                  ] as [string, string][]).map(([h, align]) => (
+                    <th key={h} className={`px-4 py-3 ${align} text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1284,14 +1612,23 @@ function WhatToOrderContent() {
 
       {/* ── 60–90 Day Order Plan ── */}
       <div>
-        <SectionHeading>60–90 Day Order Plan — Build Up for Peak Season (Jul–Nov)</SectionHeading>
+        <SectionHeading>
+          60–90 Day Order Plan — Build Up for Peak Season (Jul–Nov)
+          <DataBadge type="forecast" />
+        </SectionHeading>
         <Card className="border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr style={{ backgroundColor: PRIMARY_DARK }}>
-                  {["Collection","2025 Quince Revenue","Priority","Why Order Now","Recommended Action"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap">{h}</th>
+                  {([
+                    ["Collection",          "text-left"],
+                    ["2025 Quince Revenue",  "text-right"],
+                    ["Priority",            "text-left"],
+                    ["Why Order Now",       "text-left"],
+                    ["Recommended Action",  "text-left"],
+                  ] as [string, string][]).map(([h, align]) => (
+                    <th key={h} className={`px-4 py-3 ${align} text-[10px] font-bold uppercase tracking-widest text-white/75 whitespace-nowrap`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1299,7 +1636,7 @@ function WhatToOrderContent() {
                 {ORDER_PLAN.map((row, i) => (
                   <tr key={row.collection} className={`border-b border-border last:border-0 ${i % 2 === 1 ? "bg-muted/20" : ""}`}>
                     <td className="px-4 py-3 font-bold text-foreground tracking-wide">{row.collection}</td>
-                    <td className="px-4 py-3 font-mono text-foreground text-xs">{row.rev25}</td>
+                    <td className="px-4 py-3 text-right font-mono text-foreground text-xs">{row.rev25}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold
                         ${row.priority === "HIGH"
@@ -1320,7 +1657,10 @@ function WhatToOrderContent() {
 
       {/* ── 6-Month Strategic Order Plan ── */}
       <div>
-        <SectionHeading>6-Month Strategic Order Plan</SectionHeading>
+        <SectionHeading>
+          6-Month Strategic Order Plan
+          <DataBadge type="forecast" />
+        </SectionHeading>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {STRATEGIC_INSIGHTS.map((s) => (
             <InsightCard key={s.title} title={s.title} body={s.body} />
@@ -1401,28 +1741,34 @@ const INSIGHTS: InsightCardProps[] = [
 ];
 
 // ─── Overview content ─────────────────────────────────────────────────────────
-interface OverviewProps { appliedYear: string; appliedMonth: string }
+interface OverviewProps {
+  appliedYear:      string;
+  appliedMonth:     string;
+  appliedCompYear:  string;
+  appliedCompMonth: string;
+}
 
-function OverviewContent({ appliedYear, appliedMonth }: OverviewProps) {
-  const ml   = getMonthLabel(appliedMonth).slice(0, 3).toUpperCase();
-  const prev = +appliedYear - 1;
-  const periodLabel = ml ? `${ml} ${appliedYear}` : appliedYear;
+function OverviewContent({ appliedYear, appliedMonth, appliedCompYear, appliedCompMonth }: OverviewProps) {
+  const ml              = getMonthLabel(appliedMonth).slice(0, 3).toUpperCase();
+  const compMl          = getMonthLabel(appliedCompMonth).slice(0, 3).toUpperCase();
+  const periodLabel     = ml     ? `${ml} ${appliedYear}`     : appliedYear;
+  const prevPeriodLabel = compMl ? `${compMl} ${appliedCompYear}` : appliedCompYear;
 
   const kpis: KpiCardProps[] = [
     {
       label:     `${periodLabel} Revenue`,
       value:     "$2.32M",
-      trend:     `+43.7% vs ${ml} ${prev}`,
+      trend:     `+43.7% vs ${prevPeriodLabel}`,
       trendType: "up",
-      prevLabel: `${ml} ${prev} Revenue`,
+      prevLabel: `${prevPeriodLabel} Revenue`,
       prevValue: "$1.61M",
     },
     {
       label:     `${periodLabel} Units Sold`,
       value:     "16,542",
-      trend:     `+8.3% vs ${ml} ${prev}`,
+      trend:     `+8.3% vs ${prevPeriodLabel}`,
       trendType: "up",
-      prevLabel: `${ml} ${prev} Units`,
+      prevLabel: `${prevPeriodLabel} Units`,
       prevValue: "15,274",
     },
     {
@@ -1430,15 +1776,15 @@ function OverviewContent({ appliedYear, appliedMonth }: OverviewProps) {
       value:     "$4.88M",
       trend:     "On pace for ~$29.00M full year",
       trendType: "neutral",
-      prevLabel: `${prev} YTD (Jan–${ml || "Dec"})`,
+      prevLabel: `${appliedCompYear} YTD (Jan–${ml || "Dec"})`,
       prevValue: "$3.38M",
     },
     {
       label:     `Avg Revenue / Month (${appliedYear})`,
       value:     "$2.44M",
-      trend:     `vs $2.38M / mo in ${prev}`,
+      trend:     `vs $2.38M / mo in ${appliedCompYear}`,
       trendType: "up",
-      prevLabel: `Avg / Month (${prev})`,
+      prevLabel: `Avg / Month (${appliedCompYear})`,
       prevValue: "$2.38M",
     },
   ];
@@ -1446,124 +1792,94 @@ function OverviewContent({ appliedYear, appliedMonth }: OverviewProps) {
   return (
     <div className="p-6 lg:p-8 space-y-10">
 
-      {/* KPI row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-5 gap-y-6">
-        {kpis.map((k) => <KpiCard key={k.label} {...k} />)}
+      {/* ── Inventory alert banner ── */}
+      <div className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-5 py-4">
+        <Package className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-red-700">
+            Inventory Alert — Action Required Now
+          </p>
+          <p className="text-xs text-red-600 mt-1 leading-relaxed">
+            <strong>9 Quince SKUs are out of stock</strong> (mainly HAMPO collection) and{" "}
+            <strong>6 more are critical</strong>. Total reorder needed: $89,030 across 652 pieces.
+            Quince is the #1 fastest-growing account — stockouts here are high-risk.{" "}
+            <span className="font-semibold">See the "What to Order" tab for the full list.</span>
+          </p>
+        </div>
+        <DataBadge type="live" />
       </div>
 
-      {/* Chart row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Chart 1 – Revenue by Year */}
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-2 px-6 pt-5">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Revenue by Year
-              <span className="ml-2 text-xs font-normal text-muted-foreground">(Full Year)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-5">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart
-                data={REVENUE_BY_YEAR}
-                margin={{ top: 4, right: 16, left: 0, bottom: 4 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" vertical={false} />
-                <XAxis
-                  dataKey="year"
-                  tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tickFormatter={(v) => `$${v.toFixed(0)}M`}
-                  tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  domain={[0, 35]}
-                  width={48}
-                />
-                <Tooltip content={<RevenueTooltip />} cursor={{ fill: "hsl(207 69% 46% / 0.06)" }} />
-                <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={44}>
-                  {REVENUE_BY_YEAR.map((entry) => (
-                    <Cell
-                      key={entry.year}
-                      fill={entry.year === "2026 YTD" ? PRIMARY : PRIMARY_PALE}
-                      fillOpacity={entry.year === "2026 YTD" ? 1 : 0.8}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Chart 2 – Top 8 Accounts */}
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-2 px-6 pt-5">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Top 8 Accounts &mdash; {ml || "Full Year"} {appliedYear} Revenue
-              <span className="ml-2 text-xs font-normal text-muted-foreground">($)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-5">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart
-                data={TOP_ACCOUNTS}
-                layout="vertical"
-                margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickFormatter={fmtAxis}
-                  tick={{ fontSize: 10, fill: "hsl(210 20% 50%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="account"
-                  width={88}
-                  tick={{ fontSize: 11, fill: "hsl(210 20% 40%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  content={<AccountsTooltip />}
-                  cursor={{ fill: "hsl(207 69% 46% / 0.06)" }}
-                />
-                <Legend
-                  iconType="square"
-                  iconSize={10}
-                  wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }}
-                />
-                <Bar
-                  dataKey="rev2026"
-                  name={`${ml || "YTD"} ${appliedYear}`}
-                  fill={PRIMARY}
-                  radius={[0, 4, 4, 0]}
-                  maxBarSize={13}
-                />
-                <Bar
-                  dataKey="rev2025"
-                  name={`${ml || "YTD"} ${prev}`}
-                  fill={PRIMARY_PALE}
-                  radius={[0, 4, 4, 0]}
-                  maxBarSize={13}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
+      {/* ── KPI row ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Period Performance
+          </p>
+          <DataBadge type="filter-driven" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-5 gap-y-6">
+          {kpis.map((k) => <KpiCard key={k.label} {...k} />)}
+        </div>
       </div>
+
+      {/* ── Top 8 Accounts ── */}
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="pb-2 px-6 pt-5">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-sm font-semibold text-foreground">
+                Top 8 Accounts &mdash; {periodLabel} vs {prevPeriodLabel} Revenue
+                <span className="ml-2 text-xs font-normal text-muted-foreground">($)</span>
+              </CardTitle>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Comparing selected primary period against chosen comparison period
+              </p>
+            </div>
+            <DataBadge type="filter-driven" />
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 pb-5">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={TOP_ACCOUNTS}
+              layout="vertical"
+              margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(210 20% 93%)" horizontal={false} />
+              <XAxis
+                type="number"
+                tickFormatter={fmtAxis}
+                tick={{ fontSize: 10, fill: "hsl(210 20% 50%)" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                type="category"
+                dataKey="account"
+                width={88}
+                tick={{ fontSize: 11, fill: "hsl(210 20% 40%)" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip content={<AccountsTooltip />} cursor={{ fill: "hsl(207 69% 46% / 0.06)" }} />
+              <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }} />
+              <Bar dataKey="rev2026" name={periodLabel}     fill={PRIMARY}      radius={[0, 4, 4, 0]} maxBarSize={14} />
+              <Bar dataKey="rev2025" name={prevPeriodLabel} fill={PRIMARY_PALE} radius={[0, 4, 4, 0]} maxBarSize={14} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       {/* ── Account Winners & Losers ── */}
       <div>
         <SectionHeading>
           Account Winners &amp; Losers &mdash;{" "}
-          {ml ? `${getMonthLabel(appliedMonth)} ${appliedYear} vs ${getMonthLabel(appliedMonth)} ${prev}` : `${appliedYear} vs ${prev}`}
+          {ml && compMl
+            ? `${getMonthLabel(appliedMonth)} ${appliedYear} vs ${getMonthLabel(appliedCompMonth)} ${appliedCompYear}`
+            : ml
+            ? `${getMonthLabel(appliedMonth)} ${appliedYear} vs ${appliedCompYear}`
+            : `${appliedYear} vs ${appliedCompYear}`}
+          <DataBadge type="filter-driven" />
         </SectionHeading>
         <div className="flex flex-col lg:flex-row gap-5">
           <WinnersLosersTable title="Biggest Winners" rows={WINNERS} isWinner={true} />
@@ -1573,7 +1889,13 @@ function OverviewContent({ appliedYear, appliedMonth }: OverviewProps) {
 
       {/* ── Key Insights ── */}
       <div>
-        <SectionHeading>Key Insights</SectionHeading>
+        <SectionHeading>
+          Key Insights
+          <DataBadge type="reference" />
+        </SectionHeading>
+        <p className="text-xs text-muted-foreground -mt-3 mb-4">
+          Editorial insights — updated manually with each data refresh. Not driven by period filters.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {INSIGHTS.map((ins) => (
             <InsightCard key={ins.title} {...ins} />
@@ -1592,15 +1914,19 @@ export default function ExecutiveDashboard() {
   const [user,        setUser]        = useState<UserResponse | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Filter state
-  const [selectedYear,    setSelectedYear]    = useState(String(CURRENT_YEAR));
-  const [selectedMonth,   setSelectedMonth]   = useState("3"); // March = last full month before April
-  const [selectedQuarter, setSelectedQuarter] = useState("");
+  // Filter state — primary period
+  const [selectedYear,       setSelectedYear]       = useState(String(CURRENT_YEAR));
+  const [selectedMonth,      setSelectedMonth]      = useState("3");
+  // Filter state — comparison period (default: previous year, same month)
+  const [selectedCompYear,   setSelectedCompYear]   = useState(String(CURRENT_YEAR - 1));
+  const [selectedCompMonth,  setSelectedCompMonth]  = useState("3");
 
-  // Applied (what charts show)
-  const [appliedYear,    setAppliedYear]    = useState(String(CURRENT_YEAR));
-  const [appliedMonth,   setAppliedMonth]   = useState("3");
-  const [appliedQuarter, setAppliedQuarter] = useState("");
+  // Applied (what charts show) — primary
+  const [appliedYear,       setAppliedYear]       = useState(String(CURRENT_YEAR));
+  const [appliedMonth,      setAppliedMonth]      = useState("3");
+  // Applied — comparison
+  const [appliedCompYear,   setAppliedCompYear]   = useState(String(CURRENT_YEAR - 1));
+  const [appliedCompMonth,  setAppliedCompMonth]  = useState("3");
 
   const [graphsLoading,  setGraphsLoading]  = useState(false);
   const [graphsReady,    setGraphsReady]    = useState(false);
@@ -1622,11 +1948,12 @@ export default function ExecutiveDashboard() {
   const fire = useCallback(() => {
     setAppliedYear(selectedYear);
     setAppliedMonth(selectedMonth);
-    setAppliedQuarter(selectedQuarter);
+    setAppliedCompYear(selectedCompYear);
+    setAppliedCompMonth(selectedCompMonth);
     setGraphsReady(false);
     setGraphsLoading(true);
     setTimeout(() => { setGraphsLoading(false); setGraphsReady(true); }, 1500);
-  }, [selectedYear, selectedMonth, selectedQuarter]);
+  }, [selectedYear, selectedMonth, selectedCompYear, selectedCompMonth]);
 
   // Graphs start loading when the user dismisses the dev notice
   const dismissNotice = useCallback(() => {
@@ -1636,9 +1963,16 @@ export default function ExecutiveDashboard() {
 
   const handleApply = () => fire();
 
-  const handleYearChange = (v: string) => { setSelectedYear(v); setSelectedMonth(""); setSelectedQuarter(""); };
-  const handleMonthChange   = (v: string) => { setSelectedMonth(v); setSelectedQuarter(""); };
-  const handleQuarterChange = (v: string) => { setSelectedQuarter(v); setSelectedMonth(""); };
+  const handleYearChange = (v: string) => {
+    setSelectedYear(v);
+    setSelectedMonth("");
+    // Auto-suggest comparison = previous year, same month cleared
+    setSelectedCompYear(String(+v - 1));
+    setSelectedCompMonth("");
+  };
+  const handleMonthChange     = (v: string) => setSelectedMonth(v);
+  const handleCompYearChange  = (v: string) => setSelectedCompYear(v);
+  const handleCompMonthChange = (v: string) => setSelectedCompMonth(v);
 
   // ── Auth loading ──
   if (authLoading) {
@@ -1676,7 +2010,7 @@ export default function ExecutiveDashboard() {
     );
   }
 
-  const { period, range } = buildSubtitle(appliedYear, appliedMonth, appliedQuarter);
+  const { period, range } = buildSubtitle(appliedYear, appliedMonth, appliedCompYear, appliedCompMonth);
   const lastUpdated = new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
 
   return (
@@ -1714,77 +2048,108 @@ export default function ExecutiveDashboard() {
 
       {/* ── Filter bar ── */}
       <div className="bg-background border-b border-border px-6 lg:px-10 py-4">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-end gap-4">
           <Filter className="h-4 w-4 text-muted-foreground mb-2 shrink-0" />
 
-          {/* Year */}
+          {/* ── Primary Period ── */}
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Year
+              Primary Period
             </label>
-            <Select value={selectedYear} onValueChange={handleYearChange}>
-              <SelectTrigger className="h-9 w-[110px] text-sm">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {[...YEARS].reverse().map((y) => (
-                  <SelectItem key={y} value={y}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={selectedYear} onValueChange={handleYearChange}>
+                <SelectTrigger className="h-9 w-[100px] text-sm">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[...YEARS].reverse().map((y) => (
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedMonth} onValueChange={handleMonthChange} disabled={!selectedYear}>
+                <SelectTrigger className="h-9 w-[140px] text-sm">
+                  <SelectValue placeholder={selectedYear ? "All months" : "Year first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Month */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Month
-            </label>
-            <Select
-              value={selectedMonth}
-              onValueChange={handleMonthChange}
-              disabled={!selectedYear}
-            >
-              <SelectTrigger className="h-9 w-[150px] text-sm">
-                <SelectValue placeholder={selectedYear ? "Select month" : "Choose year first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* ── VS separator ── */}
+          <div className="flex items-center self-end mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground bg-muted rounded px-2.5 py-1.5 select-none">
+              vs
+            </span>
           </div>
 
-          {/* Quarter */}
+          {/* ── Comparison Period ── */}
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Quarter
+              Compare With
             </label>
-            <Select
-              value={selectedQuarter}
-              onValueChange={handleQuarterChange}
-              disabled={!selectedYear}
-            >
-              <SelectTrigger className="h-9 w-[170px] text-sm">
-                <SelectValue placeholder={selectedYear ? "Select quarter" : "Choose year first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {QUARTERS.map((q) => (
-                  <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={selectedCompYear} onValueChange={handleCompYearChange}>
+                <SelectTrigger className="h-9 w-[100px] text-sm">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[...YEARS].reverse().map((y) => (
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedCompMonth} onValueChange={handleCompMonthChange}>
+                <SelectTrigger className="h-9 w-[140px] text-sm">
+                  <SelectValue placeholder="All months" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <Button
             onClick={handleApply}
             size="sm"
-            className="h-9 px-5 text-sm font-semibold mb-0 self-end"
+            className="h-9 px-5 text-sm font-semibold self-end"
           >
             Apply Filters
           </Button>
         </div>
       </div>
+
+      {/* ── Filter context banner (only when graphs are ready) ── */}
+      {graphsReady && (() => {
+        const ml        = getMonthLabel(appliedMonth).slice(0, 3);
+        const compMlBan = getMonthLabel(appliedCompMonth).slice(0, 3);
+        const currLabel = ml        ? `${ml} ${appliedYear}`          : `Full Year ${appliedYear}`;
+        const compLabel = compMlBan ? `${compMlBan} ${appliedCompYear}` : `Full Year ${appliedCompYear}`;
+        return (
+          <div className="bg-blue-50 border-b border-blue-100 px-6 lg:px-10 py-2.5 flex items-center gap-2.5 flex-wrap">
+            <Info className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+            <span className="text-xs text-blue-700">
+              Showing:&ensp;
+              <span className="font-semibold">{currLabel}</span>
+              &ensp;vs&ensp;
+              <span className="font-semibold">{compLabel}</span>
+            </span>
+            <span className="text-blue-300 hidden sm:inline">·</span>
+            <span className="text-xs text-blue-500 hidden sm:inline">
+              Fixed benchmarks &amp; historical charts live in the{" "}
+              <span className="font-semibold text-gray-600">Reference Data</span> tab — unaffected by these filters.
+              <span className="ml-1 font-semibold text-violet-600">Forecast</span> sections always reflect current actuals.
+            </span>
+          </div>
+        );
+      })()}
 
       {/* ── Tabs + content ── */}
       <Tabs defaultValue="overview" className="flex flex-col">
@@ -1796,6 +2161,7 @@ export default function ExecutiveDashboard() {
               { value: "forecast",      label: "Forecast"           },
               { value: "collections",   label: "Collections & Sizes"},
               { value: "what-to-order", label: "What to Order"      },
+              { value: "reference",     label: "Reference Data"     },
             ].map(({ value, label }) => (
               <TabsTrigger
                 key={value}
@@ -1821,7 +2187,10 @@ export default function ExecutiveDashboard() {
           {graphsLoading ? (
             <LoadingState />
           ) : graphsReady ? (
-            <OverviewContent appliedYear={appliedYear} appliedMonth={appliedMonth} />
+            <OverviewContent
+              appliedYear={appliedYear} appliedMonth={appliedMonth}
+              appliedCompYear={appliedCompYear} appliedCompMonth={appliedCompMonth}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 py-32 text-muted-foreground text-sm">
               <Filter className="h-8 w-8 opacity-20" />
@@ -1839,7 +2208,10 @@ export default function ExecutiveDashboard() {
           {graphsLoading ? (
             <LoadingState />
           ) : graphsReady ? (
-            <AccountsContent appliedYear={appliedYear} appliedMonth={appliedMonth} />
+            <AccountsContent
+              appliedYear={appliedYear} appliedMonth={appliedMonth}
+              appliedCompYear={appliedCompYear} appliedCompMonth={appliedCompMonth}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 py-32 text-muted-foreground text-sm">
               <Filter className="h-8 w-8 opacity-20" />
@@ -1888,6 +2260,11 @@ export default function ExecutiveDashboard() {
               <p>Select filters and click <span className="font-semibold text-foreground">Apply Filters</span> to load.</p>
             </div>
           )}
+        </TabsContent>
+
+        {/* Reference Data tab — fully independent of period filters */}
+        <TabsContent value="reference" className="m-0 p-0 data-[state=inactive]:hidden">
+          <ReferenceDataContent />
         </TabsContent>
       </Tabs>
       </div>{/* end scrollable content area */}
