@@ -107,19 +107,6 @@ export default function Header() {
           <span className="hidden sm:inline">Chat with Database</span>
         </Button>
 
-        {user?.role === "executive" && (
-          <Button
-            variant="ghost"
-            className={`gap-2 text-sm sm:text-base px-2 sm:px-4 ${pathname === "/executive-dashboard" ? "text-primary" : ""}`}
-            onClick={() => {
-              console.log("[Header] Navigate to /executive-dashboard");
-              navigate("/executive-dashboard");
-            }}
-          >
-            <BarChart2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Executive Dashboard</span>
-          </Button>
-        )}
 
         <Button
           variant="ghost"
