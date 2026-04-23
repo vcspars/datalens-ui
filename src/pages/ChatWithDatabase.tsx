@@ -1207,7 +1207,7 @@ function DatabaseTabs({
       {/* Tab bar — white background, blue-accented tabs */}
       <div className="px-4 py-3 bg-background border-b flex items-center justify-between flex-shrink-0">
         <TabsList className="flex-1 bg-primary/10 border border-primary/20 rounded-lg h-9">
-          {(["overview", "graphs", "report"] as const).map((tab) => (
+          {(["overview", "graphs"] as const).map((tab) => (
             <TabsTrigger
               key={tab}
               value={tab}
@@ -1437,8 +1437,8 @@ function DatabaseTabs({
             </Card>
           </TabsContent>
 
-          {/* -------- Report -------- */}
-          <TabsContent value="report" className="mt-0 flex-1 min-h-0 data-[state=inactive]:hidden">
+          {/* -------- Report (hidden) -------- */}
+          <TabsContent value="report" className="hidden">
             <Card className="h-full flex flex-col min-h-0">
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 flex-shrink-0">
                 <div className="space-y-1.5">
