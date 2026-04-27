@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Mic, MicOff, Loader2, Star, Maximize2, Minimize2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -259,18 +265,25 @@ export default function Chatbot({ datasetId, datasetType, externalQuestion, onQu
                 )}
               </Button>
             </div>
-            <Button
-              onClick={toggleRecording}
-              variant={isRecording ? "destructive" : "outline"}
-              size="icon"
-              className="h-full w-full"
-            >
-              {isRecording ? (
-                <MicOff className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <Mic className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="h-full w-full">
+                    <Button
+                      disabled
+                      variant="outline"
+                      size="icon"
+                      className="h-full w-full opacity-40 cursor-not-allowed text-muted-foreground"
+                    >
+                      <Mic className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>Voice input requires HTTPS and is not available in local environments.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>

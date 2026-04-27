@@ -32,6 +32,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import BookmarkedQuestionsDialog from "@/components/BookmarkedQuestionsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -850,20 +856,25 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 }
               </Button>
             </div>
-            <Button
-              onClick={() => (isRecording ? stopVoiceInput() : startVoiceInput())}
-              variant={isRecording ? "destructive" : "outline"}
-              size="icon"
-              className={`h-full w-full relative ${isRecording ? "animate-pulse" : ""}`}
-            >
-              {isRecording && (
-                <span className="absolute inset-0 rounded-md bg-destructive/40 animate-ping" aria-hidden />
-              )}
-              {isRecording
-                ? <Mic className="h-3 w-3 xl:h-4 xl:w-4 relative z-10" />
-                : <Mic className="h-3 w-3 xl:h-4 xl:w-4" />
-              }
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="h-full w-full">
+                    <Button
+                      disabled
+                      variant="outline"
+                      size="icon"
+                      className="h-full w-full relative opacity-40 cursor-not-allowed text-muted-foreground"
+                    >
+                      <Mic className="h-3 w-3 xl:h-4 xl:w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>Voice input requires HTTPS and is not available in local environments.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>
