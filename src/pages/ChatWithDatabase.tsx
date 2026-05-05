@@ -32,6 +32,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import BookmarkedQuestionsDialog from "@/components/BookmarkedQuestionsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -791,17 +797,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                               {copiedMessageId === message.id ? "Copied" : "Copy"}
                             </Button>
                           ) : null}
-                          {message.sql_query && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs gap-1.5"
-                              onClick={() => setSqlPopupMessage(message)}
-                              aria-label="View SQL"
-                            >
-                              SQL
-                            </Button>
-                          )}
+                          {/* SQL button hidden per UI request */}
                           {message.role === "assistant" && message.id !== "welcome" && (
                             <Button
                               size="sm"
@@ -850,20 +846,25 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 }
               </Button>
             </div>
-            <Button
-              onClick={() => (isRecording ? stopVoiceInput() : startVoiceInput())}
-              variant={isRecording ? "destructive" : "outline"}
-              size="icon"
-              className={`h-full w-full relative ${isRecording ? "animate-pulse" : ""}`}
-            >
-              {isRecording && (
-                <span className="absolute inset-0 rounded-md bg-destructive/40 animate-ping" aria-hidden />
-              )}
-              {isRecording
-                ? <Mic className="h-3 w-3 xl:h-4 xl:w-4 relative z-10" />
-                : <Mic className="h-3 w-3 xl:h-4 xl:w-4" />
-              }
-            </Button>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="h-full w-full">
+                    <Button
+                      disabled
+                      variant="outline"
+                      size="icon"
+                      className="h-full w-full relative cursor-not-allowed opacity-50"
+                    >
+                      <Mic className="h-3 w-3 xl:h-4 xl:w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-center text-xs">
+                  Voice input is available on HTTPS. Currently environment is for testing.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>
