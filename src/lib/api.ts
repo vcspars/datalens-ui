@@ -188,9 +188,49 @@ export interface ChatHistoryResponse {
   session_id: string;
 }
 
-export const getChatHistory = async (): Promise<ChatHistoryResponse> => {
+export const getChatHistory = async (opts?: { bustCache?: boolean }): Promise<ChatHistoryResponse> => {
+  const suffix = opts?.bustCache ? `?_=${Date.now()}` : "";
   console.log("[API] getChatHistory");
-  return apiRequest<ChatHistoryResponse>("/chat/history");
+  return apiRequest<ChatHistoryResponse>(`/chat/history${suffix}`);
+};
+
+export interface ChatPendingResponse {
+  active: boolean;
+  user_message_id?: string;
+  question?: string;
+}
+
+export const getChatPending = async (): Promise<ChatPendingResponse> => {
+  console.log("[API] getChatPending");
+  return apiRequest<ChatPendingResponse>("/chat/pending");
+};
+
+export const cancelChatGeneration = async (
+  userMessageId?: string,
+  keepPartial = false,
+  partialContent?: string,
+): Promise<{
+  cancelled: boolean;
+  user_message_id?: string;
+  question?: string;
+  user_message_deleted?: boolean;
+  assistant_db_id?: string | null;
+}> => {
+  console.log("[API] cancelChatGeneration", userMessageId ?? "latest", keepPartial ? "keep_partial" : "full_cancel");
+  return apiRequest<{
+    cancelled: boolean;
+    user_message_id?: string;
+    question?: string;
+    user_message_deleted?: boolean;
+    assistant_db_id?: string | null;
+  }>("/chat/cancel", {
+    method: "POST",
+    body: JSON.stringify({
+      user_message_id: userMessageId || undefined,
+      keep_partial: keepPartial,
+      partial_content: partialContent?.trim() || undefined,
+    }),
+  });
 };
 
 export const clearChatHistory = async (): Promise<void> => {
@@ -352,15 +392,20 @@ export const streamDbQuestions = async (): Promise<ReadableStreamDefaultReader<U
 /**
  * Open an SSE stream for chat with database.
  * Returns a ReadableStreamDefaultReader to consume events.
+ *
+ * Pass an AbortSignal (from AbortController) to support stop-generation.
+ * When aborted, the fetch throws an AbortError which the caller must handle.
  */
 export const streamChat = async (
-  question: string
+  question: string,
+  signal?: AbortSignal,
 ): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
   const token = getAuthToken();
   console.log("[API] streamChat question:", question.slice(0, 80));
 
   const response = await fetch(`${API_BASE_URL}/chat/stream`, {
     method: "POST",
+    signal,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

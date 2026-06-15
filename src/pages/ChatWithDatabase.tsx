@@ -44,9 +44,12 @@ import { copyToClipboard } from "@/lib/clipboard";
 import {
   Send, Mic, MicOff, Loader2, Star, Maximize2, Minimize2,
   User, Copy, Check, BookmarkPlus, BarChart3, Sparkles, Download, Trash2,
+  StopCircle,
 } from "lucide-react";
 import {
   getChatHistory,
+  getChatPending,
+  cancelChatGeneration,
   streamChat,
   saveDashboardTable,
   clearChatHistory,
@@ -296,6 +299,11 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  // Baseline history length when we inject the post-reload Thinking… placeholder.
+  const pendingUserContentRef = useRef<string | null>(null);
+  const pendingUserMessageIdRef = useRef<string | null>(null);
+  const pendingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pendingFromDb, setPendingFromDb] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [bookmarkRefreshTrigger, setBookmarkRefreshTrigger] = useState(0);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -307,6 +315,62 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const chatPanelRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputAtVoiceStartRef = useRef("");
+  // AbortController for the active SSE fetch — lets the Stop button cancel it.
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // Synchronous guard that prevents a second send while one is in flight,
+  // even if React hasn't re-rendered isLoading=true yet (race-condition fix).
+  const isLoadingRef = useRef(false);
+
+  const setAwaitingResponse = useCallback((active: boolean, userMessageId?: string | null) => {
+    if (active) {
+      setPendingFromDb(true);
+      setIsLoading(true);
+      isLoadingRef.current = true;
+      if (userMessageId) pendingUserMessageIdRef.current = userMessageId;
+      window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: true }));
+    } else {
+      setPendingFromDb(false);
+      setIsLoading(false);
+      isLoadingRef.current = false;
+      pendingUserMessageIdRef.current = null;
+      window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: false }));
+    }
+  }, []);
+
+  const isAwaitingResponse = isLoading || pendingFromDb || messages.some((m) => m.id === "pending-thinking");
+
+  /** Put a cancelled thinking-stage question back in the input and remove it from chat. */
+  const restoreQuestionAfterThinkingStop = useCallback((questionText: string) => {
+    const q = questionText.trim();
+    if (q) setInput(q);
+    pendingUserContentRef.current = null;
+    pendingUserMessageIdRef.current = null;
+    setMessages((prev) => {
+      let next = prev.filter(
+        (m) => m.id !== "pending-thinking" && !(m.isStreaming && !m.content?.trim()),
+      );
+      if (q) {
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].role === "user" && next[i].content.trim() === q) {
+            next = [...next.slice(0, i), ...next.slice(i + 1)];
+            break;
+          }
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const thinkingStopHandledRef = useRef(false);
+  const streamedContentRef = useRef("");
+  const activeAssistantIdRef = useRef<string | null>(null);
+  const streamMetaRef = useRef({
+    has_table: false,
+    table_data: [] as Record<string, string>[],
+    table_columns: [] as string[],
+    tables: [] as TableEntry[],
+    sql_query: "",
+  });
 
   // Debug: log actual chat panel and scroll viewport widths whenever they change
   useEffect(() => {
@@ -404,7 +468,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     const load = async () => {
       console.log("[ChatPanel] Loading chat history...");
       try {
-        const data = await getChatHistory();
+        const [data, pending] = await Promise.all([getChatHistory(), getChatPending()]);
         console.log(`[ChatPanel] Loaded ${data.messages.length} history messages`);
         const welcome: Message = {
           id: "welcome",
@@ -422,7 +486,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         } else {
           const historyMessages: Message[] = data.messages.map((m: ChatMessageItem) => ({
             id: m.id,
-            db_id: m.id, // history messages already carry the real MongoDB _id
+            db_id: m.id,
             role: m.role as "user" | "assistant",
             content: m.content,
             timestamp: new Date(m.created_at),
@@ -432,7 +496,63 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             tables: m.tables as TableEntry[] | undefined,
             sql_query: m.sql_query,
           }));
-          setMessages([welcome, ...historyMessages]);
+
+          // ── Pending-question detection (DB source of truth) ───────────────
+          const historyHasAssistantAfterUser = (
+            userMsgId: string | undefined,
+            userContent: string | undefined,
+            msgs: Message[],
+          ): boolean => {
+            let userIdx = -1;
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              const m = msgs[i];
+              if (m.role !== "user") continue;
+              if (userMsgId && m.db_id === userMsgId) {
+                userIdx = i;
+                break;
+              }
+              if (userContent && m.content.trim() === userContent.trim()) {
+                userIdx = i;
+                break;
+              }
+            }
+            if (userIdx < 0) return false;
+            return msgs.slice(userIdx + 1).some((m) => m.role === "assistant");
+          };
+
+          let finalMessages: Message[] = [welcome, ...historyMessages];
+          if (pending.active) {
+            const pendingUserMsg = pending.user_message_id
+              ? historyMessages.find((m) => m.db_id === pending.user_message_id)
+              : historyMessages
+                  .slice()
+                  .reverse()
+                  .find((m) => m.role === "user" && m.content.trim() === (pending.question ?? "").trim());
+
+            pendingUserContentRef.current = pendingUserMsg?.content ?? pending.question ?? null;
+            pendingUserMessageIdRef.current = pending.user_message_id ?? null;
+            setAwaitingResponse(true, pending.user_message_id);
+
+            const alreadyAnswered = historyHasAssistantAfterUser(
+              pending.user_message_id,
+              pendingUserMsg?.content ?? pending.question,
+              historyMessages,
+            );
+            if (!alreadyAnswered) {
+              finalMessages = [
+                ...finalMessages,
+                {
+                  id: "pending-thinking",
+                  role: "assistant" as const,
+                  content: "",
+                  timestamp: new Date(),
+                  isStreaming: true,
+                },
+              ];
+            }
+          }
+
+          setMessages(finalMessages);
         }
       } catch (err) {
         console.error("[ChatPanel] Failed to load history:", err);
@@ -451,19 +571,138 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
       }
     };
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Pending-thinking poller ─────────────────────────────────────────────────
+  // After a reload mid-generation we inject id="pending-thinking".  Poll history
+  // until the backend saves the assistant reply, then replace the placeholder.
+  // Poll while DB says a generation is active or we show the Thinking… placeholder.
+  const hasPendingPlaceholder = messages.some((m) => m.id === "pending-thinking");
+  const shouldPollForAnswer = hasPendingPlaceholder || pendingFromDb;
+
+  /** True when history contains an assistant reply after the pending user question. */
+  const historyHasPendingAnswer = (msgs: ChatMessageItem[]): boolean => {
+    const pending = pendingUserContentRef.current?.trim();
+    if (!pending) {
+      const last = msgs[msgs.length - 1];
+      return last?.role === "assistant";
+    }
+    let userIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === "user" && msgs[i].content.trim() === pending) {
+        userIdx = i;
+        break;
+      }
+    }
+    if (userIdx < 0) return false;
+    return msgs.slice(userIdx + 1).some((m) => m.role === "assistant");
+  };
+
+  useEffect(() => {
+    if (!shouldPollForAnswer) {
+      if (pendingPollRef.current) {
+        clearInterval(pendingPollRef.current);
+        pendingPollRef.current = null;
+      }
+      return;
+    }
+
+    const applyHistory = (msgs: ChatMessageItem[], stillPending = false) => {
+      const historyMessages: Message[] = msgs.map((m: ChatMessageItem) => ({
+        id: m.id,
+        db_id: m.id,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        timestamp: new Date(m.created_at),
+        has_table: m.has_table,
+        table_data: m.table_data as Record<string, string>[],
+        table_columns: m.table_columns,
+        tables: m.tables as TableEntry[] | undefined,
+        sql_query: m.sql_query,
+      }));
+
+      if (!stillPending) {
+        pendingUserContentRef.current = null;
+        pendingUserMessageIdRef.current = null;
+        setAwaitingResponse(false);
+      }
+      setMessages((prev) => {
+        const welcome = prev.find((m) => m.id === "welcome");
+        return welcome ? [welcome, ...historyMessages] : historyMessages;
+      });
+
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" });
+      });
+    };
+
+    const poll = async () => {
+      try {
+        const [data, pending] = await Promise.all([
+          getChatHistory({ bustCache: true }),
+          getChatPending(),
+        ]);
+        const msgs = data.messages as ChatMessageItem[];
+        if (!msgs.length) return;
+
+        if (!pending.active && !historyHasPendingAnswer(msgs)) {
+          if (pendingPollRef.current) {
+            clearInterval(pendingPollRef.current);
+            pendingPollRef.current = null;
+          }
+          const questionToRestore = pendingUserContentRef.current?.trim() ?? "";
+          const stillInDb = questionToRestore
+            ? msgs.some((m) => m.role === "user" && m.content.trim() === questionToRestore)
+            : false;
+          if (questionToRestore && !stillInDb) {
+            restoreQuestionAfterThinkingStop(questionToRestore);
+          } else {
+            setMessages((prev) => prev.filter((m) => m.id !== "pending-thinking"));
+          }
+          setAwaitingResponse(false);
+          return;
+        }
+
+        if (historyHasPendingAnswer(msgs)) {
+          applyHistory(msgs, pending.active);
+          if (!pending.active && pendingPollRef.current) {
+            clearInterval(pendingPollRef.current);
+            pendingPollRef.current = null;
+          }
+          return;
+        }
+      } catch (e) {
+        console.warn("[ChatPanel] Pending-thinking poll skipped:", e);
+      }
+    };
+
+    void poll();
+    pendingPollRef.current = setInterval(() => void poll(), 2000);
+
+    return () => {
+      if (pendingPollRef.current) {
+        clearInterval(pendingPollRef.current);
+        pendingPollRef.current = null;
+      }
+    };
+  }, [shouldPollForAnswer, setAwaitingResponse, restoreQuestionAfterThinkingStop]);
 
   const handleSend = useCallback(async (messageText?: string) => {
     const textToSend = messageText || input;
-    if (!textToSend.trim() || isLoading) return;
+    if (!textToSend.trim() || isLoading || isLoadingRef.current || pendingFromDb) return;
+
+    // Mark in-flight synchronously before any await
+    isLoadingRef.current = true;
 
     console.log("[ChatPanel] Sending:", textToSend.slice(0, 80));
 
     // Track latest user prompt for downstream save-to-dashboard metadata
     lastUserPromptRef.current = textToSend;
 
+    const userMsgId = `user-${Date.now()}`;
     const userMsg: Message = {
-      id: `user-${Date.now()}`,
+      id: userMsgId,
       role: "user",
       content: textToSend,
       timestamp: new Date(),
@@ -480,7 +719,21 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
 
     setMessages(prev => [...prev, userMsg, assistantPlaceholder]);
     setInput("");
+    streamedContentRef.current = "";
+    activeAssistantIdRef.current = assistantId;
+    streamMetaRef.current = {
+      has_table: false,
+      table_data: [],
+      table_columns: [],
+      tables: [],
+      sql_query: "",
+    };
     setIsLoading(true);
+    isLoadingRef.current = true;
+    window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: true }));
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     let fullContent = "";
     let hasTable = false;
@@ -490,7 +743,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     let sqlQuery = "";
 
     try {
-      const reader = await streamChat(textToSend);
+      const reader = await streamChat(textToSend, controller.signal);
       const decoder = new TextDecoder();
       let buffer = "";
 
@@ -510,24 +763,40 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
 
           if (event.type === "token") {
             fullContent += event.content as string;
+            streamedContentRef.current = fullContent;
             setMessages(prev => prev.map(m =>
               m.id === assistantId ? { ...m, content: fullContent } : m
             ));
+          } else if (event.type === "user_saved") {
+            const uid = event.user_message_id as string;
+            pendingUserMessageIdRef.current = uid;
+            console.log("[ChatPanel] User message persisted | db_id:", uid);
           } else if (event.type === "done") {
             fullContent = (event.full_response as string) || fullContent;
+            streamedContentRef.current = fullContent;
             hasTable = (event.has_table as boolean) || false;
             tableData = (event.table_data as Record<string, string>[]) || [];
             tableColumns = (event.table_columns as string[]) || [];
             allTables = (event.tables as TableEntry[]) || [];
             sqlQuery = (event.sql_query as string) || "";
+            streamMetaRef.current = {
+              has_table: hasTable,
+              table_data: tableData,
+              table_columns: tableColumns,
+              tables: allTables,
+              sql_query: sqlQuery,
+            };
             console.log(`[ChatPanel] Done | has_table=${hasTable} | tables=${allTables.length} | sql_query=${!!sqlQuery}`);
           } else if (event.type === "saved") {
-            // Backend confirmed the assistant message was persisted — store the real MongoDB _id
+            // Backend confirmed the assistant message was persisted
             const dbId = event.assistant_db_id as string;
             console.log("[ChatPanel] Assistant message saved to DB | db_id:", dbId);
             setMessages(prev => prev.map(m =>
               m.id === assistantId ? { ...m, db_id: dbId } : m
             ));
+            isLoadingRef.current = false;
+            setIsLoading(false);
+            window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: false }));
           } else if (event.type === "error") {
             console.error("[ChatPanel] SSE error:", event.content);
             toast({ title: "Error", description: event.content as string, variant: "destructive" });
@@ -541,17 +810,109 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
           : m
       ));
     } catch (err) {
-      console.error("[ChatPanel] Fetch error:", err);
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId
-          ? { ...m, content: `Sorry, something went wrong: ${String(err)}`, isStreaming: false }
-          : m
-      ));
-      toast({ title: "Connection error", description: String(err), variant: "destructive" });
+      const error = err as Error;
+
+      if (error.name === "AbortError") {
+        // User deliberately stopped the generation
+        console.log("[ChatPanel] Generation stopped by user");
+        if (thinkingStopHandledRef.current) {
+          thinkingStopHandledRef.current = false;
+        } else if (!streamedContentRef.current.trim() && !fullContent.trim()) {
+          restoreQuestionAfterThinkingStop(lastUserPromptRef.current);
+        } else {
+          const partialContent = streamedContentRef.current || fullContent;
+          const meta = streamMetaRef.current;
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: partialContent,
+                  isStreaming: false,
+                  has_table: meta.has_table,
+                  table_data: meta.table_data,
+                  table_columns: meta.table_columns,
+                  tables: meta.tables,
+                  sql_query: meta.sql_query || undefined,
+                }
+              : m
+          ));
+        }
+        // AbortError is intentional — no error toast
+      } else {
+        console.error("[ChatPanel] Fetch error:", error);
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId
+            ? { ...m, content: `Sorry, something went wrong: ${error.message}`, isStreaming: false }
+            : m
+        ));
+        toast({ title: "Connection error", description: error.message, variant: "destructive" });
+      }
     } finally {
+      abortControllerRef.current = null;
+      isLoadingRef.current = false;
       setIsLoading(false);
+      window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: false }));
+      streamedContentRef.current = "";
+      activeAssistantIdRef.current = null;
     }
-  }, [input, isLoading, toast]);
+  }, [input, isLoading, pendingFromDb, toast, restoreQuestionAfterThinkingStop]);
+
+  // Stop — cancels DB generation (unless partial content) and aborts the SSE stream
+  const handleStop = useCallback(async () => {
+    const streamingAssistant = messages.find(
+      (m) => m.isStreaming || m.id === activeAssistantIdRef.current,
+    );
+    const partialContent =
+      streamedContentRef.current.trim() ||
+      streamingAssistant?.content?.trim() ||
+      "";
+    const hadContent = Boolean(partialContent);
+    const msgId = pendingUserMessageIdRef.current ?? undefined;
+    let questionToRestore =
+      pendingUserContentRef.current ?? lastUserPromptRef.current ?? "";
+    let assistantDbId: string | undefined;
+    try {
+      const result = await cancelChatGeneration(
+        msgId,
+        hadContent,
+        hadContent ? partialContent : undefined,
+      );
+      if (!hadContent && result.question) {
+        questionToRestore = result.question;
+      }
+      if (result.assistant_db_id) {
+        assistantDbId = result.assistant_db_id;
+      }
+    } catch (err) {
+      console.warn("[ChatPanel] Cancel generation failed:", err);
+    }
+    if (!hadContent) {
+      thinkingStopHandledRef.current = true;
+      restoreQuestionAfterThinkingStop(questionToRestore);
+    } else {
+      const meta = streamMetaRef.current;
+      setMessages((prev) =>
+        prev.map((m) => {
+          const isActive = m.isStreaming || m.id === activeAssistantIdRef.current;
+          if (!isActive) return m;
+          return {
+            ...m,
+            content: partialContent,
+            isStreaming: false,
+            db_id: assistantDbId ?? m.db_id,
+            has_table: meta.has_table,
+            table_data: meta.table_data,
+            table_columns: meta.table_columns,
+            tables: meta.tables,
+            sql_query: meta.sql_query || undefined,
+          };
+        }),
+      );
+      thinkingStopHandledRef.current = true;
+    }
+    abortControllerRef.current?.abort();
+    setAwaitingResponse(false);
+  }, [messages, setAwaitingResponse, restoreQuestionAfterThinkingStop]);
 
   // Support suggested question clicks from the right panel
   useEffect(() => {
@@ -839,22 +1200,39 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             onKeyPress={handleKeyPress}
             placeholder="Ask a question about your data..."
             className="min-h-[44px] xl:min-h-[60px] max-h-[100px] xl:max-h-[120px] resize-none flex-1 text-xs xl:text-sm"
-            disabled={isLoading}
+            disabled={isAwaitingResponse}
           />
           <div className="flex flex-col gap-2 flex-shrink-0">
             <div className="flex gap-2">
               <BookmarkedQuestionsDialog onSelectQuestion={handleSelectBookmarkedQuestion} refreshTrigger={bookmarkRefreshTrigger} />
-              <Button
-                onClick={() => handleSend()}
-                disabled={!input.trim() || isLoading}
-                size="icon"
-                className="h-[44px] xl:h-[60px] w-10 xl:w-12"
-              >
-                {isLoading
-                  ? <Loader2 className="h-4 w-4 xl:h-5 xl:w-5 animate-spin" />
-                  : <Send className="h-4 w-4 xl:h-5 xl:w-5" />
-                }
-              </Button>
+              {isAwaitingResponse ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleStop}
+                        size="icon"
+                        variant="destructive"
+                        className="h-[44px] xl:h-[60px] w-10 xl:w-12"
+                        aria-label="Stop generation"
+                      >
+                        <StopCircle className="h-4 w-4 xl:h-5 xl:w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Stop generation</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim()}
+                  size="icon"
+                  className="h-[44px] xl:h-[60px] w-10 xl:w-12"
+                  aria-label="Send message"
+                >
+                  <Send className="h-4 w-4 xl:h-5 xl:w-5" />
+                </Button>
+              )}
             </div>
             <TooltipProvider>
               <Tooltip>
@@ -988,6 +1366,43 @@ function DatabaseTabs({
   // Report state
   const [reportText, setReportText] = useState("");
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  // Mirror the chat panel's loading state so suggested-question buttons can be
+  // disabled while a response is in flight, preventing the race condition where
+  // a second question is fired before React re-renders with isLoading=true.
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  useEffect(() => {
+    getChatPending()
+      .then((pending) => {
+        if (pending.active) {
+          setIsChatLoading(true);
+        }
+      })
+      .catch((err) => console.warn("[DatabaseTabs] Could not load pending state:", err));
+  }, []);
+
+  // Keep suggested-question disable in sync with DB after reload / cancel
+  useEffect(() => {
+    if (!isChatLoading) return;
+    const poll = () => {
+      getChatPending()
+        .then((pending) => {
+          if (!pending.active) {
+            setIsChatLoading(false);
+          }
+        })
+        .catch((err) => console.warn("[DatabaseTabs] Pending poll skipped:", err));
+    };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, [isChatLoading]);
+
+  useEffect(() => {
+    const handler = (e: CustomEvent<boolean>) => setIsChatLoading(e.detail);
+    window.addEventListener("db-chat-loading" as any, handler as any);
+    return () => window.removeEventListener("db-chat-loading" as any, handler as any);
+  }, []);
 
   // Load persisted overview from MongoDB on mount
   useEffect(() => {
@@ -1345,14 +1760,29 @@ function DatabaseTabs({
                             className="flex items-center justify-between gap-2 p-2 sm:p-3 bg-background border rounded-lg hover:bg-muted/50 transition-colors group"
                           >
                             <span className="text-xs sm:text-sm flex-1 text-foreground">{question}</span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8 opacity-70 group-hover:opacity-100 transition-opacity"
-                              onClick={() => handleSendQuestion(question)}
-                            >
-                              <Send className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8 opacity-70 group-hover:opacity-100 transition-opacity"
+                                      onClick={() => handleSendQuestion(question)}
+                                      disabled={isChatLoading}
+                                      aria-label="Send question"
+                                    >
+                                      <Send className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {isChatLoading && (
+                                  <TooltipContent side="top">
+                                    Wait for the current response to finish
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         ))}
                       </div>
