@@ -43,7 +43,7 @@ export default function PDFViewer({ pdfId }: PDFViewerProps) {
         setError(null);
         
         const token = localStorage.getItem("auth_token");
-        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://122.129.80.228:8005/api";
+        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8005/api";
         
         // Create a blob URL from the PDF download
         const response = await fetch(`${API_BASE_URL}/datasets/${pdfId}/download`, {
