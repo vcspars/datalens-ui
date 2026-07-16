@@ -117,6 +117,60 @@ function parseSSELine(line: string): { type: string; [key: string]: unknown } | 
   try { return JSON.parse(t.slice(6)); } catch { return null; }
 }
 
+/** True when history/UI already has an assistant reply after the pending user turn. */
+function hasAssistantAfterPendingUser(
+  msgs: Array<{ role: string; content?: string; db_id?: string; id?: string }>,
+  userMessageId?: string | null,
+  userContent?: string | null,
+): boolean {
+  const content = userContent?.trim();
+  let userIdx = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m.role !== "user") continue;
+    if (userMessageId && (m.db_id === userMessageId || m.id === userMessageId)) {
+      userIdx = i;
+      break;
+    }
+    if (content && m.content?.trim() === content) {
+      userIdx = i;
+      break;
+    }
+  }
+  if (userIdx < 0) {
+    const last = msgs[msgs.length - 1];
+    return last?.role === "assistant";
+  }
+  return msgs.slice(userIdx + 1).some((m) => m.role === "assistant");
+}
+
+/** Index of the assistant message tied to the pending user turn (if any). */
+function findPendingAssistantIndex(
+  msgs: Array<{ role: string; content?: string; db_id?: string; id?: string }>,
+  userMessageId?: string | null,
+  userContent?: string | null,
+): number {
+  const content = userContent?.trim();
+  let userIdx = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m.role !== "user") continue;
+    if (userMessageId && (m.db_id === userMessageId || m.id === userMessageId)) {
+      userIdx = i;
+      break;
+    }
+    if (content && m.content?.trim() === content) {
+      userIdx = i;
+      break;
+    }
+  }
+  if (userIdx < 0) return -1;
+  for (let i = userIdx + 1; i < msgs.length; i++) {
+    if (msgs[i].role === "assistant") return i;
+  }
+  return -1;
+}
+
 // ---------------------------------------------------------------------------
 // Table action buttons — rendered OUTSIDE the message bubble
 // ---------------------------------------------------------------------------
@@ -324,20 +378,31 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   const setAwaitingResponse = useCallback((active: boolean, userMessageId?: string | null) => {
     if (active) {
       setPendingFromDb(true);
+      if (userMessageId) pendingUserMessageIdRef.current = userMessageId;
       setIsLoading(true);
       isLoadingRef.current = true;
-      if (userMessageId) pendingUserMessageIdRef.current = userMessageId;
       window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: true }));
     } else {
       setPendingFromDb(false);
       setIsLoading(false);
       isLoadingRef.current = false;
+      pendingUserContentRef.current = null;
       pendingUserMessageIdRef.current = null;
       window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: false }));
     }
   }, []);
 
-  const isAwaitingResponse = isLoading || pendingFromDb || messages.some((m) => m.id === "pending-thinking");
+  /** After reload: track backend generation without treating this tab as an active SSE stream. */
+  const activatePendingPoll = useCallback((userMessageId?: string | null) => {
+    setPendingFromDb(true);
+    if (userMessageId) pendingUserMessageIdRef.current = userMessageId;
+    window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: true }));
+  }, []);
+
+  const hasPendingPlaceholder = messages.some((m) => m.id === "pending-thinking");
+
+  /** Stop / disabled inputs — only while backend generation is active or this tab is streaming. */
+  const isAwaitingResponse = isLoading || pendingFromDb || hasPendingPlaceholder;
 
   /** Put a cancelled thinking-stage question back in the input and remove it from chat. */
   const restoreQuestionAfterThinkingStop = useCallback((questionText: string) => {
@@ -497,29 +562,6 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             sql_query: m.sql_query,
           }));
 
-          // ── Pending-question detection (DB source of truth) ───────────────
-          const historyHasAssistantAfterUser = (
-            userMsgId: string | undefined,
-            userContent: string | undefined,
-            msgs: Message[],
-          ): boolean => {
-            let userIdx = -1;
-            for (let i = msgs.length - 1; i >= 0; i--) {
-              const m = msgs[i];
-              if (m.role !== "user") continue;
-              if (userMsgId && m.db_id === userMsgId) {
-                userIdx = i;
-                break;
-              }
-              if (userContent && m.content.trim() === userContent.trim()) {
-                userIdx = i;
-                break;
-              }
-            }
-            if (userIdx < 0) return false;
-            return msgs.slice(userIdx + 1).some((m) => m.role === "assistant");
-          };
-
           let finalMessages: Message[] = [welcome, ...historyMessages];
           if (pending.active) {
             const pendingUserMsg = pending.user_message_id
@@ -531,14 +573,28 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
 
             pendingUserContentRef.current = pendingUserMsg?.content ?? pending.question ?? null;
             pendingUserMessageIdRef.current = pending.user_message_id ?? null;
-            setAwaitingResponse(true, pending.user_message_id);
 
-            const alreadyAnswered = historyHasAssistantAfterUser(
+            const alreadyAnswered = hasAssistantAfterPendingUser(
+              historyMessages,
               pending.user_message_id,
               pendingUserMsg?.content ?? pending.question,
-              historyMessages,
             );
-            if (!alreadyAnswered) {
+            if (alreadyAnswered) {
+              // Reload mid-stream: show saved DB content, poll for updates until backend finishes
+              activatePendingPoll(pending.user_message_id);
+              const assistantIdx = findPendingAssistantIndex(
+                historyMessages,
+                pending.user_message_id,
+                pendingUserMsg?.content ?? pending.question,
+              );
+              if (assistantIdx >= 0) {
+                historyMessages[assistantIdx] = {
+                  ...historyMessages[assistantIdx],
+                  isStreaming: true,
+                };
+              }
+            } else {
+              setAwaitingResponse(true, pending.user_message_id);
               finalMessages = [
                 ...finalMessages,
                 {
@@ -578,26 +634,15 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
   // After a reload mid-generation we inject id="pending-thinking".  Poll history
   // until the backend saves the assistant reply, then replace the placeholder.
   // Poll while DB says a generation is active or we show the Thinking… placeholder.
-  const hasPendingPlaceholder = messages.some((m) => m.id === "pending-thinking");
   const shouldPollForAnswer = hasPendingPlaceholder || pendingFromDb;
 
   /** True when history contains an assistant reply after the pending user question. */
-  const historyHasPendingAnswer = (msgs: ChatMessageItem[]): boolean => {
-    const pending = pendingUserContentRef.current?.trim();
-    if (!pending) {
-      const last = msgs[msgs.length - 1];
-      return last?.role === "assistant";
-    }
-    let userIdx = -1;
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].role === "user" && msgs[i].content.trim() === pending) {
-        userIdx = i;
-        break;
-      }
-    }
-    if (userIdx < 0) return false;
-    return msgs.slice(userIdx + 1).some((m) => m.role === "assistant");
-  };
+  const historyHasPendingAnswer = (msgs: ChatMessageItem[]): boolean =>
+    findPendingAssistantIndex(
+      msgs,
+      pendingUserMessageIdRef.current,
+      pendingUserContentRef.current,
+    ) >= 0;
 
   useEffect(() => {
     if (!shouldPollForAnswer) {
@@ -609,7 +654,15 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     }
 
     const applyHistory = (msgs: ChatMessageItem[], stillPending = false) => {
-      const historyMessages: Message[] = msgs.map((m: ChatMessageItem) => ({
+      const assistantIdx = stillPending
+        ? findPendingAssistantIndex(
+            msgs,
+            pendingUserMessageIdRef.current,
+            pendingUserContentRef.current,
+          )
+        : -1;
+
+      const historyMessages: Message[] = msgs.map((m: ChatMessageItem, idx: number) => ({
         id: m.id,
         db_id: m.id,
         role: m.role as "user" | "assistant",
@@ -620,6 +673,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         table_columns: m.table_columns,
         tables: m.tables as TableEntry[] | undefined,
         sql_query: m.sql_query,
+        ...(stillPending && idx === assistantIdx ? { isStreaming: true } : {}),
       }));
 
       if (!stillPending) {
@@ -646,31 +700,49 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         const msgs = data.messages as ChatMessageItem[];
         if (!msgs.length) return;
 
-        if (!pending.active && !historyHasPendingAnswer(msgs)) {
+        // Backend finished — stop polling and finalize UI
+        if (!pending.active) {
           if (pendingPollRef.current) {
             clearInterval(pendingPollRef.current);
             pendingPollRef.current = null;
           }
-          const questionToRestore = pendingUserContentRef.current?.trim() ?? "";
-          const stillInDb = questionToRestore
-            ? msgs.some((m) => m.role === "user" && m.content.trim() === questionToRestore)
-            : false;
-          if (questionToRestore && !stillInDb) {
-            restoreQuestionAfterThinkingStop(questionToRestore);
+          if (historyHasPendingAnswer(msgs)) {
+            applyHistory(msgs, false);
           } else {
-            setMessages((prev) => prev.filter((m) => m.id !== "pending-thinking"));
+            const questionToRestore = pendingUserContentRef.current?.trim() ?? "";
+            const stillInDb = questionToRestore
+              ? msgs.some((m) => m.role === "user" && m.content.trim() === questionToRestore)
+              : false;
+            if (questionToRestore && !stillInDb) {
+              restoreQuestionAfterThinkingStop(questionToRestore);
+            } else {
+              setMessages((prev) => prev.filter((m) => m.id !== "pending-thinking"));
+            }
+            setAwaitingResponse(false);
           }
-          setAwaitingResponse(false);
           return;
         }
 
+        // Still processing — refresh history (including growing partial answers)
         if (historyHasPendingAnswer(msgs)) {
-          applyHistory(msgs, pending.active);
-          if (!pending.active && pendingPollRef.current) {
-            clearInterval(pendingPollRef.current);
-            pendingPollRef.current = null;
-          }
-          return;
+          applyHistory(msgs, true);
+        } else if (hasPendingPlaceholder) {
+          // Thinking stage — keep placeholder visible until first DB partial arrives
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === "pending-thinking")) return prev;
+            const welcome = prev.find((m) => m.id === "welcome");
+            const withoutPlaceholder = prev.filter((m) => m.id !== "pending-thinking");
+            const thinking: Message = {
+              id: "pending-thinking",
+              role: "assistant",
+              content: "",
+              timestamp: new Date(),
+              isStreaming: true,
+            };
+            return welcome
+              ? [welcome, ...withoutPlaceholder.filter((m) => m.id !== "welcome"), thinking]
+              : [...withoutPlaceholder, thinking];
+          });
         }
       } catch (e) {
         console.warn("[ChatPanel] Pending-thinking poll skipped:", e);
@@ -678,7 +750,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     };
 
     void poll();
-    pendingPollRef.current = setInterval(() => void poll(), 2000);
+    pendingPollRef.current = setInterval(() => void poll(), 1000);
 
     return () => {
       if (pendingPollRef.current) {
@@ -1394,7 +1466,7 @@ function DatabaseTabs({
         .catch((err) => console.warn("[DatabaseTabs] Pending poll skipped:", err));
     };
     poll();
-    const id = setInterval(poll, 2000);
+    const id = setInterval(poll, 1000);
     return () => clearInterval(id);
   }, [isChatLoading]);
 
