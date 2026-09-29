@@ -2,7 +2,7 @@
 
 import { toast } from "@/hooks/use-toast";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://122.129.80.228:8007/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://122.129.80.228:8008/api";
 
 // ---------------------------------------------------------------------------
 // Token management
@@ -11,7 +11,7 @@ export const getAuthToken = (): string | null => localStorage.getItem("auth_toke
 export const setAuthToken = (token: string): void => localStorage.setItem("auth_token", token);
 export const removeAuthToken = (): void => localStorage.removeItem("auth_token");
 
-const AUTH_REDIRECT_URL = "http://122.129.80.228:4177/auth";
+const AUTH_REDIRECT_URL = "http://122.129.80.228:7777/auth";
 
 /**
  * Call after fetch(); on 401 shows session-expired toast, then removes token and redirects to login.

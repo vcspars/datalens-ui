@@ -25,6 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -32,12 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import BookmarkedQuestionsDialog from "@/components/BookmarkedQuestionsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -797,7 +792,19 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                               {copiedMessageId === message.id ? "Copied" : "Copy"}
                             </Button>
                           ) : null}
-                          {/* SQL button hidden per UI request */}
+                          {/* SQL BUTTON — remove the outer comment tags below to show it again
+                          {message.sql_query && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1.5"
+                              onClick={() => setSqlPopupMessage(message)}
+                              aria-label="View SQL"
+                            >
+                              SQL
+                            </Button>
+                          )}
+                          */}
                           {message.role === "assistant" && message.id !== "welcome" && (
                             <Button
                               size="sm"
@@ -846,7 +853,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                 }
               </Button>
             </div>
-            <TooltipProvider delayDuration={0}>
+            <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="h-full w-full">
@@ -854,14 +861,14 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                       disabled
                       variant="outline"
                       size="icon"
-                      className="h-full w-full relative cursor-not-allowed opacity-50"
+                      className="h-full w-full opacity-40 cursor-not-allowed"
                     >
-                      <Mic className="h-3 w-3 xl:h-4 xl:w-4" />
+                      <MicOff className="h-3 w-3 xl:h-4 xl:w-4" />
                     </Button>
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[220px] text-center text-xs">
-                  Voice input is available on HTTPS. Currently environment is for testing.
+                <TooltipContent side="top" className="max-w-[180px] text-center text-xs">
+                  Microphone is only available on HTTPS connections
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

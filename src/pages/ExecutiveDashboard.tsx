@@ -83,14 +83,14 @@ const REVENUE_BY_YEAR = [
 ];
 
 const TOP_ACCOUNTS = [
-  { account: "Quince",      rev2026: 582400, rev2025: 401200 },
-  { account: "Wayfair",     rev2026: 498700, rev2025: 520100 },
-  { account: "Rugs Direct", rev2026: 361500, rev2025: 298400 },
-  { account: "Fred Meyer",  rev2026: 312800, rev2025: 275600 },
-  { account: "Overstock",   rev2026: 287300, rev2025: 310900 },
-  { account: "W.Sonoma",    rev2026: 261400, rev2025: 241800 },
-  { account: "HG Buying",   rev2026: 198500, rev2025: 183200 },
-  { account: "Lulu & GA",   rev2026: 142600, rev2025: 128900 },
+  { account: "Client A", rev2026: 582400, rev2025: 401200 },
+  { account: "Client B", rev2026: 498700, rev2025: 520100 },
+  { account: "Client C", rev2026: 361500, rev2025: 298400 },
+  { account: "Client D", rev2026: 312800, rev2025: 275600 },
+  { account: "Client E", rev2026: 287300, rev2025: 310900 },
+  { account: "Client F", rev2026: 261400, rev2025: 241800 },
+  { account: "Client G", rev2026: 198500, rev2025: 183200 },
+  { account: "Client H", rev2026: 142600, rev2025: 128900 },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -352,50 +352,50 @@ interface FullAccountRow {
 }
 
 const ALL_ACCOUNTS: FullAccountRow[] = [
-  { rank:  1, account: "Quince",            isStar: true,  rev26: "$576,389", rev25: "$35,115",  yoyDol: "+$541,274", yoyPct: "+1,541%", yoyUp: true,  units26: 2566, status: "STAR",      action: "Daily attention — protect stock" },
-  { rank:  2, account: "Wayfair",           isStar: false, rev26: "$485,262", rev25: "$395,568", yoyDol: "+$89,694",  yoyPct: "+23%",    yoyUp: true,  units26: 3474, status: "GROWING",   action: "Weekly check-in" },
-  { rank:  3, account: "Rugs Direct",       isStar: false, rev26: "$163,366", rev25: "$125,218", yoyDol: "+$38,148",  yoyPct: "+30%",    yoyUp: true,  units26: 723,  status: "GROWING",   action: "Weekly check-in" },
-  { rank:  4, account: "Fred Meyer",        isStar: false, rev26: "$152,079", rev25: "$18,651",  yoyDol: "+$133,428", yoyPct: "+715%",   yoyUp: true,  units26: 2376, status: "STAR",      action: "Weekly check-in" },
-  { rank:  5, account: "Overstock",         isStar: false, rev26: "$141,411", rev25: "$97,005",  yoyDol: "+$44,406",  yoyPct: "+46%",    yoyUp: true,  units26: 819,  status: "GROWING",   action: "Weekly check-in" },
-  { rank:  6, account: "Williams Sonoma",   isStar: false, rev26: "$123,827", rev25: "$215,023", yoyDol: "-$91,196",  yoyPct: "-42%",    yoyUp: false, units26: 1033, status: "DECLINING", action: "URGENT — Recovery call" },
-  { rank:  7, account: "HG Buying",         isStar: false, rev26: "$121,530", rev25: "$33,840",  yoyDol: "+$87,690",  yoyPct: "+259%",   yoyUp: true,  units26: 1884, status: "GROWING",   action: "Weekly check-in" },
-  { rank:  8, account: "Lulu & Georgia",    isStar: false, rev26: "$37,998",  rev25: "$48,955",  yoyDol: "-$10,957",  yoyPct: "-22%",    yoyUp: false, units26: 126,  status: "DECLINING", action: "Recovery call needed" },
-  { rank:  9, account: "Ramble Market",     isStar: false, rev26: "$34,257",  rev25: "$0",       yoyDol: "+$34,257",  yoyPct: "NEW",     yoyUp: "new", units26: 51,   status: "NEW",       action: "Nurture relationship" },
-  { rank: 10, account: "Target",            isStar: false, rev26: "$33,478",  rev25: "$83,101",  yoyDol: "-$49,623",  yoyPct: "-60%",    yoyUp: false, units26: 303,  status: "DECLINING", action: "URGENT — Recovery call" },
-  { rank: 11, account: "TJ Maxx.com",       isStar: false, rev26: "$23,607",  rev25: "$0",       yoyDol: "+$23,607",  yoyPct: "NEW",     yoyUp: "new", units26: 121,  status: "NEW",       action: "Nurture relationship" },
-  { rank: 12, account: "Bison Commerce",    isStar: false, rev26: "$23,525",  rev25: "$14,525",  yoyDol: "+$9,000",   yoyPct: "+82%",    yoyUp: true,  units26: 192,  status: "GROWING",   action: "Monthly check-in" },
-  { rank: 13, account: "Walmart",           isStar: false, rev26: "$14,953",  rev25: "$18,445",  yoyDol: "-$3,492",   yoyPct: "-19%",    yoyUp: false, units26: 92,   status: "WATCH",     action: "Monthly check-in" },
-  { rank: 14, account: "Marshalls.com",     isStar: false, rev26: "$14,175",  rev25: "$0",       yoyDol: "+$14,175",  yoyPct: "NEW",     yoyUp: "new", units26: 83,   status: "NEW",       action: "Nurture relationship" },
-  { rank: 15, account: "One Kings Lane",    isStar: false, rev26: "$11,032",  rev25: "$11,216",  yoyDol: "+$186",     yoyPct: "FLAT",    yoyUp: "flat",units26: 56,   status: "STABLE",    action: "Monthly check-in" },
-  { rank: 16, account: "Mackenzie Childs",  isStar: false, rev26: "$9,727",   rev25: "$39,593",  yoyDol: "-$29,066",  yoyPct: "-75%",    yoyUp: false, units26: 207,  status: "CRITICAL",  action: "URGENT — Executive call" },
+  { rank:  1, account: "Client A",  isStar: true,  rev26: "$576,389", rev25: "$35,115",  yoyDol: "+$541,274", yoyPct: "+1,541%", yoyUp: true,  units26: 2566, status: "STAR",      action: "Daily attention — protect stock" },
+  { rank:  2, account: "Client B",  isStar: false, rev26: "$485,262", rev25: "$395,568", yoyDol: "+$89,694",  yoyPct: "+23%",    yoyUp: true,  units26: 3474, status: "GROWING",   action: "Weekly check-in" },
+  { rank:  3, account: "Client C",  isStar: false, rev26: "$163,366", rev25: "$125,218", yoyDol: "+$38,148",  yoyPct: "+30%",    yoyUp: true,  units26: 723,  status: "GROWING",   action: "Weekly check-in" },
+  { rank:  4, account: "Client D",  isStar: false, rev26: "$152,079", rev25: "$18,651",  yoyDol: "+$133,428", yoyPct: "+715%",   yoyUp: true,  units26: 2376, status: "STAR",      action: "Weekly check-in" },
+  { rank:  5, account: "Client E",  isStar: false, rev26: "$141,411", rev25: "$97,005",  yoyDol: "+$44,406",  yoyPct: "+46%",    yoyUp: true,  units26: 819,  status: "GROWING",   action: "Weekly check-in" },
+  { rank:  6, account: "Client F",  isStar: false, rev26: "$123,827", rev25: "$215,023", yoyDol: "-$91,196",  yoyPct: "-42%",    yoyUp: false, units26: 1033, status: "DECLINING", action: "URGENT — Recovery call" },
+  { rank:  7, account: "Client G",  isStar: false, rev26: "$121,530", rev25: "$33,840",  yoyDol: "+$87,690",  yoyPct: "+259%",   yoyUp: true,  units26: 1884, status: "GROWING",   action: "Weekly check-in" },
+  { rank:  8, account: "Client H",  isStar: false, rev26: "$37,998",  rev25: "$48,955",  yoyDol: "-$10,957",  yoyPct: "-22%",    yoyUp: false, units26: 126,  status: "DECLINING", action: "Recovery call needed" },
+  { rank:  9, account: "Client I",  isStar: false, rev26: "$34,257",  rev25: "$0",       yoyDol: "+$34,257",  yoyPct: "NEW",     yoyUp: "new", units26: 51,   status: "NEW",       action: "Nurture relationship" },
+  { rank: 10, account: "Client J",  isStar: false, rev26: "$33,478",  rev25: "$83,101",  yoyDol: "-$49,623",  yoyPct: "-60%",    yoyUp: false, units26: 303,  status: "DECLINING", action: "URGENT — Recovery call" },
+  { rank: 11, account: "Client K",  isStar: false, rev26: "$23,607",  rev25: "$0",       yoyDol: "+$23,607",  yoyPct: "NEW",     yoyUp: "new", units26: 121,  status: "NEW",       action: "Nurture relationship" },
+  { rank: 12, account: "Client L",  isStar: false, rev26: "$23,525",  rev25: "$14,525",  yoyDol: "+$9,000",   yoyPct: "+82%",    yoyUp: true,  units26: 192,  status: "GROWING",   action: "Monthly check-in" },
+  { rank: 13, account: "Client M",  isStar: false, rev26: "$14,953",  rev25: "$18,445",  yoyDol: "-$3,492",   yoyPct: "-19%",    yoyUp: false, units26: 92,   status: "WATCH",     action: "Monthly check-in" },
+  { rank: 14, account: "Client N",  isStar: false, rev26: "$14,175",  rev25: "$0",       yoyDol: "+$14,175",  yoyPct: "NEW",     yoyUp: "new", units26: 83,   status: "NEW",       action: "Nurture relationship" },
+  { rank: 15, account: "Client O",  isStar: false, rev26: "$11,032",  rev25: "$11,216",  yoyDol: "+$186",     yoyPct: "FLAT",    yoyUp: "flat",units26: 56,   status: "STABLE",    action: "Monthly check-in" },
+  { rank: 16, account: "Client P",  isStar: false, rev26: "$9,727",   rev25: "$39,593",  yoyDol: "-$29,066",  yoyPct: "-75%",    yoyUp: false, units26: 207,  status: "CRITICAL",  action: "URGENT — Executive call" },
 ];
 
 // ─── Historical revenue by key account ───────────────────────────────────────
 const HIST_DATA = [
-  { year:"2018", Wayfair:5200, WilliamsSonoma:1900, Overstock:1250, RugsDirect:870,  Quince:0    },
-  { year:"2019", Wayfair:5400, WilliamsSonoma:2180, Overstock:1450, RugsDirect:980,  Quince:0    },
-  { year:"2020", Wayfair:4850, WilliamsSonoma:2020, Overstock:1820, RugsDirect:910,  Quince:0    },
-  { year:"2021", Wayfair:5850, WilliamsSonoma:2460, Overstock:1680, RugsDirect:1060, Quince:0    },
-  { year:"2022", Wayfair:5320, WilliamsSonoma:2280, Overstock:1310, RugsDirect:1190, Quince:0    },
-  { year:"2023", Wayfair:4920, WilliamsSonoma:2100, Overstock:1120, RugsDirect:1110, Quince:0    },
-  { year:"2024", Wayfair:5180, WilliamsSonoma:2160, Overstock:1010, RugsDirect:1080, Quince:48   },
-  { year:"2025", Wayfair:5520, WilliamsSonoma:2080, Overstock:1060, RugsDirect:1270, Quince:3180 },
+  { year:"2018", ClientB:5200, ClientF:1900, ClientE:1250, ClientC:870,  ClientA:0    },
+  { year:"2019", ClientB:5400, ClientF:2180, ClientE:1450, ClientC:980,  ClientA:0    },
+  { year:"2020", ClientB:4850, ClientF:2020, ClientE:1820, ClientC:910,  ClientA:0    },
+  { year:"2021", ClientB:5850, ClientF:2460, ClientE:1680, ClientC:1060, ClientA:0    },
+  { year:"2022", ClientB:5320, ClientF:2280, ClientE:1310, ClientC:1190, ClientA:0    },
+  { year:"2023", ClientB:4920, ClientF:2100, ClientE:1120, ClientC:1110, ClientA:0    },
+  { year:"2024", ClientB:5180, ClientF:2160, ClientE:1010, ClientC:1080, ClientA:48   },
+  { year:"2025", ClientB:5520, ClientF:2080, ClientE:1060, ClientC:1270, ClientA:3180 },
 ];
 
 const LINE_COLORS = {
-  Wayfair:        "#2480BE",
-  WilliamsSonoma: "#f97316",
-  Overstock:      "#a855f7",
-  RugsDirect:     "#06b6d4",
-  Quince:         "#10b981",
+  ClientB: "#2480BE",
+  ClientF: "#f97316",
+  ClientE: "#a855f7",
+  ClientC: "#06b6d4",
+  ClientA: "#10b981",
 };
 
 const LINE_LABELS: Record<string, string> = {
-  Wayfair:        "Wayfair",
-  WilliamsSonoma: "Williams Sonoma",
-  Overstock:      "Overstock",
-  RugsDirect:     "Rugs Direct",
-  Quince:         "Quince",
+  ClientB: "Client B",
+  ClientF: "Client F",
+  ClientE: "Client E",
+  ClientC: "Client C",
+  ClientA: "Client A",
 };
 
 // ─── Quince concentration risk data ──────────────────────────────────────────
@@ -517,16 +517,16 @@ interface ForecastRow {
 }
 
 const FORECAST_ROWS: ForecastRow[] = [
-  { account: "Quince",          fy2025: "$3,169,481", base2026: "$5,500,000", upside2026: "$7,000,000", monthly: "$576K", priority: "TOP PRIORITY", driver: "Peak season Jul–Nov = 58% of rev. Must stock now." },
-  { account: "Wayfair",         fy2025: "$5,604,375", base2026: "$5,800,000", upside2026: "$6,200,000", monthly: "$485K", priority: "TOP PRIORITY", driver: "Solid growth momentum. Protect with inventory." },
-  { account: "Rugs Direct",     fy2025: "$1,685,086", base2026: "$1,900,000", upside2026: "$2,200,000", monthly: "$163K", priority: "GROW",         driver: "Strong +30% Feb. Expand SKU offering." },
-  { account: "Overstock",       fy2025: "$1,654,633", base2026: "$1,800,000", upside2026: "$2,100,000", monthly: "$141K", priority: "GROW",         driver: "+46% Feb. Continued momentum expected." },
-  { account: "Williams Sonoma", fy2025: "$2,146,566", base2026: "$1,600,000", upside2026: "$2,000,000", monthly: "$124K", priority: "RECOVER",      driver: "Down 42% Feb. Root cause unknown. Sales call urgent." },
-  { account: "HG Buying",       fy2025: "$1,062,691", base2026: "$1,400,000", upside2026: "$1,700,000", monthly: "$122K", priority: "GROW",         driver: "+259% Feb. Major new volume." },
-  { account: "Target",          fy2025: "$820,976",   base2026: "$600,000",   upside2026: "$900,000",   monthly: "$33K",  priority: "RECOVER",      driver: "Down 60% Feb. Root cause unknown. Escalate." },
-  { account: "Mackenzie Childs",fy2025: "$1,141,023", base2026: "$500,000",   upside2026: "$900,000",   monthly: "$10K",  priority: "RECOVER",      driver: "Down 75% Feb. Critical account in danger." },
-  { account: "Lulu & Georgia",  fy2025: "$489,550",   base2026: "$400,000",   upside2026: "$550,000",   monthly: "$38K",  priority: "WATCH",        driver: "Down 22% Feb. Monitor closely." },
-  { account: "Fred Meyer",      fy2025: "$349,233",   base2026: "$900,000",   upside2026: "$1,400,000", monthly: "$152K", priority: "GROW",         driver: "+715% Feb — new major volume. Track weekly." },
+  { account: "Client A", fy2025: "$3,169,481", base2026: "$5,500,000", upside2026: "$7,000,000", monthly: "$576K", priority: "TOP PRIORITY", driver: "Peak season Jul–Nov = 58% of rev. Must stock now." },
+  { account: "Client B", fy2025: "$5,604,375", base2026: "$5,800,000", upside2026: "$6,200,000", monthly: "$485K", priority: "TOP PRIORITY", driver: "Solid growth momentum. Protect with inventory." },
+  { account: "Client C", fy2025: "$1,685,086", base2026: "$1,900,000", upside2026: "$2,200,000", monthly: "$163K", priority: "GROW",         driver: "Strong +30% Feb. Expand SKU offering." },
+  { account: "Client E", fy2025: "$1,654,633", base2026: "$1,800,000", upside2026: "$2,100,000", monthly: "$141K", priority: "GROW",         driver: "+46% Feb. Continued momentum expected." },
+  { account: "Client F", fy2025: "$2,146,566", base2026: "$1,600,000", upside2026: "$2,000,000", monthly: "$124K", priority: "RECOVER",      driver: "Down 42% Feb. Root cause unknown. Sales call urgent." },
+  { account: "Client G", fy2025: "$1,062,691", base2026: "$1,400,000", upside2026: "$1,700,000", monthly: "$122K", priority: "GROW",         driver: "+259% Feb. Major new volume." },
+  { account: "Client J", fy2025: "$820,976",   base2026: "$600,000",   upside2026: "$900,000",   monthly: "$33K",  priority: "RECOVER",      driver: "Down 60% Feb. Root cause unknown. Escalate." },
+  { account: "Client P", fy2025: "$1,141,023", base2026: "$500,000",   upside2026: "$900,000",   monthly: "$10K",  priority: "RECOVER",      driver: "Down 75% Feb. Critical account in danger." },
+  { account: "Client H", fy2025: "$489,550",   base2026: "$400,000",   upside2026: "$550,000",   monthly: "$38K",  priority: "WATCH",        driver: "Down 22% Feb. Monitor closely." },
+  { account: "Client D", fy2025: "$349,233",   base2026: "$900,000",   upside2026: "$1,400,000", monthly: "$152K", priority: "GROW",         driver: "+715% Feb — new major volume. Track weekly." },
 ];
 
 const PRIORITY_STYLE: Record<string, string> = {
@@ -588,11 +588,11 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
       prevValue: "$27.63M",
     },
     {
-      label:     "Quince Annual Run Rate",
+      label:     "Client A Annual Run Rate",
       value:     "$6.5M",
       trend:     "Based on Jan 2026 pace",
       trendType: "up",
-      prevLabel: "Quince Full Year 2025",
+      prevLabel: "Client A Full Year 2025",
       prevValue: "$3.17M",
     },
     {
@@ -723,10 +723,10 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
         </Card>
       </div>
 
-      {/* ── Quince Monthly Revenue Trajectory ── */}
+      {/* ── Client A Monthly Revenue Trajectory ── */}
       <div>
         <SectionHeading>
-          Quince Monthly Revenue Trajectory
+          Client A Monthly Revenue Trajectory
           <DataBadge type="live" />
         </SectionHeading>
         <Card className="border border-border shadow-sm">
@@ -734,7 +734,7 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-sm font-semibold text-foreground">
-                  Quince Revenue Per Month — 2025 to {currentYear}
+                  Client A Revenue Per Month — 2025 to {currentYear}
                   <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
                 </CardTitle>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -788,7 +788,7 @@ function ForecastContent({ appliedYear }: ForecastContentProps) {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-sm font-semibold text-foreground">
-                  Quince Revenue % by Month — 2025 Seasonal Pattern
+                  Client A Revenue % by Month — 2025 Seasonal Pattern
                   <span className="ml-2 text-xs font-normal text-muted-foreground">Peak Season Jul–Nov</span>
                 </CardTitle>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -952,7 +952,7 @@ function CollectionsContent({ appliedYear, appliedMonth }: CollectionsContentPro
       <div className="bg-white border border-border rounded-lg shadow-md px-4 py-3">
         <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">{label}</p>
         <p className="text-sm font-bold text-foreground">
-          2025 Quince Revenue ($K): {payload[0].value}
+          2025 Client A Revenue ($K): {payload[0].value}
         </p>
       </div>
     );
@@ -1090,7 +1090,7 @@ function ReferenceDataContent() {
           {label === "2026P" ? "2026 (Projected)" : label}
         </p>
         <div className="flex justify-between gap-4 text-xs">
-          <span className="text-muted-foreground">Quince % of Revenue</span>
+          <span className="text-muted-foreground">Client A % of Revenue</span>
           <span className="font-bold" style={{ color: payload[0]?.value >= 20 ? "#dc2626" : PRIMARY_DARK }}>
             {payload[0]?.value.toFixed(1)}%
           </span>
@@ -1098,7 +1098,7 @@ function ReferenceDataContent() {
         {d && (
           <>
             <div className="flex justify-between gap-4 text-xs mt-1">
-              <span className="text-muted-foreground">Quince Revenue</span>
+              <span className="text-muted-foreground">Client A Revenue</span>
               <span className="font-semibold text-foreground">${d.quince.toFixed(2)}M</span>
             </div>
             <div className="flex justify-between gap-4 text-xs mt-1">
@@ -1117,7 +1117,7 @@ function ReferenceDataContent() {
       <div className="bg-white border border-border rounded-lg shadow-md px-4 py-3">
         <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">{label}</p>
         <p className="text-sm font-bold text-foreground">
-          2025 Quince Revenue ($K): {payload[0].value}
+          2025 Client A Revenue ($K): {payload[0].value}
         </p>
       </div>
     );
@@ -1211,7 +1211,7 @@ function ReferenceDataContent() {
                 {Object.keys(LINE_COLORS).map((key) => (
                   <Line key={key} type="monotone" dataKey={key}
                     stroke={LINE_COLORS[key as keyof typeof LINE_COLORS]}
-                    strokeWidth={key === "Quince" ? 2.5 : 1.8}
+                    strokeWidth={key === "ClientA" ? 2.5 : 1.8}
                     dot={{ r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }}
                   />
                 ))}
@@ -1221,10 +1221,10 @@ function ReferenceDataContent() {
         </Card>
       </div>
 
-      {/* ── Quince Concentration Risk ── */}
+      {/* ── Client A Concentration Risk ── */}
       <div>
         <SectionHeading>
-          Quince Revenue Concentration Risk
+          Client A Revenue Concentration Risk
           <DataBadge type="reference" />
         </SectionHeading>
         <Card className="border border-border shadow-sm">
@@ -1232,7 +1232,7 @@ function ReferenceDataContent() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-sm font-semibold text-foreground">
-                  Quince as % of Total Company Revenue — 2018 to 2026
+                  Client A as % of Total Company Revenue — 2018 to 2026
                   <span className="ml-2 text-xs font-normal text-muted-foreground">(2026 = projected)</span>
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1265,18 +1265,18 @@ function ReferenceDataContent() {
                         fill={isRisk ? "#dc2626" : PRIMARY_DARK} stroke="white" strokeWidth={1.5} />
                     );
                   }}
-                  activeDot={{ r: 6 }} name="Quince % of Revenue"
+                  activeDot={{ r: 6 }} name="Client A % of Revenue"
                 />
               </ComposedChart>
             </ResponsiveContainer>
             <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
               <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
               <p className="text-xs text-red-700 leading-relaxed">
-                <strong>Concentration Risk:</strong> Quince grew from 0% in 2023 to a projected{" "}
-                <strong>22.4% of total revenue in 2026</strong>. At this level, any reduction in Quince
+                <strong>Concentration Risk:</strong> Client A grew from 0% in 2023 to a projected{" "}
+                <strong>22.4% of total revenue in 2026</strong>. At this level, any reduction in Client A
                 orders (delistings, platform changes, buyer turnover) would have an immediate and material
-                impact on full-year results. Accelerating recovery of Williams Sonoma, Target, and
-                Mackenzie Childs is the primary risk mitigation lever.
+                impact on full-year results. Accelerating recovery of Client F, Client J, and
+                Client P is the primary risk mitigation lever.
               </p>
             </div>
           </CardContent>
@@ -1286,11 +1286,11 @@ function ReferenceDataContent() {
       {/* ── Best-Selling Sizes ── */}
       <div>
         <SectionHeading>
-          Best-Selling Sizes — Quince 2025 Reference Data
+          Best-Selling Sizes — Client A 2025 Reference Data
           <DataBadge type="reference" />
         </SectionHeading>
         <p className="text-xs text-muted-foreground -mt-3 mb-4">
-          Size distribution based on Quince 2025 full-year actuals — the most recent complete year
+          Size distribution based on Client A 2025 full-year actuals — the most recent complete year
           available. A structural product-mix benchmark independent of period filters.
         </p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1300,7 +1300,7 @@ function ReferenceDataContent() {
             <CardHeader className="pb-2 px-6 pt-5">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-sm font-semibold text-foreground">
-                  Revenue Share by Size — Quince 2025
+                  Revenue Share by Size — Client A 2025
                 </CardTitle>
                 <DataBadge type="reference" />
               </div>
@@ -1338,7 +1338,7 @@ function ReferenceDataContent() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <CardTitle className="text-sm font-semibold text-foreground">Top SKUs by Revenue</CardTitle>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Quince 2025 Full Year — Reference Data</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Client A 2025 Full Year — Reference Data</p>
                 </div>
                 <DataBadge type="reference" />
               </div>
@@ -1379,21 +1379,21 @@ function ReferenceDataContent() {
         </div>
       </div>
 
-      {/* ── Top Quince Collections 2025 ── */}
+      {/* ── Top Client A Collections 2025 ── */}
       <div>
         <SectionHeading>
-          Top Quince Collections — Full Year 2025 (Reference)
+          Top Client A Collections — Full Year 2025 (Reference)
           <DataBadge type="reference" />
         </SectionHeading>
         <p className="text-xs text-muted-foreground -mt-3 mb-4">
-          Quince 2025 full-year collection breakdown — the most recent complete year available.
+          Client A 2025 full-year collection breakdown — the most recent complete year available.
         </p>
         <Card className="border border-border shadow-sm">
           <CardHeader className="pb-0 px-6 pt-5">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-sm font-semibold text-foreground">
-                  Quince Revenue by Collection — 2025 Full Year
+                  Client A Revenue by Collection — 2025 Full Year
                   <span className="ml-2 text-xs font-normal text-muted-foreground">($K)</span>
                 </CardTitle>
               </div>
@@ -1407,7 +1407,7 @@ function ReferenceDataContent() {
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => `$${v}K`} tick={{ fontSize: 11, fill: "hsl(210 20% 50%)" }} axisLine={false} tickLine={false} width={56} />
                 <Tooltip content={<QuinceBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                <Bar dataKey="rev" name="2025 Quince Revenue ($K)" fill={PRIMARY_DARK} radius={[4, 4, 0, 0]} maxBarSize={44} />
+                <Bar dataKey="rev" name="2025 Client A Revenue ($K)" fill={PRIMARY_DARK} radius={[4, 4, 0, 0]} maxBarSize={44} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -1431,17 +1431,17 @@ interface UrgencyRow {
 }
 
 const IMMEDIATE_ORDERS: UrgencyRow[] = [
-  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT80A0", collection: "HAMPO", color: "Natural", size: "8×10", pieces: 44, value: "$7,920",  account: "Quince" },
-  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT90C0", collection: "HAMPO", color: "Natural", size: "9×12", pieces: 24, value: "$5,640",  account: "Quince" },
-  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT80A0", collection: "HAMPO", color: "Natural", size: "8×10", pieces: 28, value: "$5,040",  account: "Quince" },
-  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-6NAT90C0", collection: "HAMPO", color: "Natural", size: "9×12", pieces: 14, value: "$3,290",  account: "Quince" },
-  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT4160", collection: "HAMPO", color: "Natural", size: "4×6",  pieces: 34, value: "$1,632",  account: "Quince" },
-  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT5370", collection: "HAMPO", color: "Natural", size: "5×7",  pieces: 18, value: "$1,440",  account: "Quince" },
-  { urgency: "CRITICAL",     sku: "TEPPETEP-2GRY80A0", collection: "TEPPE", color: "Grey",    size: "8×10", pieces: 49, value: "$12,985", account: "Quince" },
-  { urgency: "CRITICAL",     sku: "HAMPOHAM-6NAT5370", collection: "HAMPO", color: "Natural", size: "5×7",  pieces: 33, value: "$2,640",  account: "Quince" },
-  { urgency: "CRITICAL",     sku: "TEPPETEP-2GRY2030", collection: "TEPPE", color: "Grey",    size: "2×3",  pieces: 34, value: "$748",    account: "Quince" },
-  { urgency: "CRITICAL",     sku: "TEPPETEP-2GRY5080", collection: "TEPPE", color: "Grey",    size: "5×6",  pieces: 31, value: "$4,185",  account: "Quince" },
-  { urgency: "CRITICAL",     sku: "HAMPOHAM-5NAT6090", collection: "HAMPO", color: "Natural", size: "6×9",  pieces: 17, value: "$2,040",  account: "Quince" },
+  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT80A0", collection: "HAMPO", color: "Natural", size: "8×10", pieces: 44, value: "$7,920",  account: "Client A" },
+  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT90C0", collection: "HAMPO", color: "Natural", size: "9×12", pieces: 24, value: "$5,640",  account: "Client A" },
+  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT80A0", collection: "HAMPO", color: "Natural", size: "8×10", pieces: 28, value: "$5,040",  account: "Client A" },
+  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-6NAT90C0", collection: "HAMPO", color: "Natural", size: "9×12", pieces: 14, value: "$3,290",  account: "Client A" },
+  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT4160", collection: "HAMPO", color: "Natural", size: "4×6",  pieces: 34, value: "$1,632",  account: "Client A" },
+  { urgency: "OUT OF STOCK", sku: "HAMPOHAM-5NAT5370", collection: "HAMPO", color: "Natural", size: "5×7",  pieces: 18, value: "$1,440",  account: "Client A" },
+  { urgency: "CRITICAL",     sku: "TEPPETEP-2GRY80A0", collection: "TEPPE", color: "Grey",    size: "8×10", pieces: 49, value: "$12,985", account: "Client A" },
+  { urgency: "CRITICAL",     sku: "HAMPOHAM-6NAT5370", collection: "HAMPO", color: "Natural", size: "5×7",  pieces: 33, value: "$2,640",  account: "Client A" },
+  { urgency: "CRITICAL",     sku: "TEPPETEP-2GRY2030", collection: "TEPPE", color: "Grey",    size: "2×3",  pieces: 34, value: "$748",    account: "Client A" },
+  { urgency: "CRITICAL",     sku: "TEPPETEP-2GRY5080", collection: "TEPPE", color: "Grey",    size: "5×6",  pieces: 31, value: "$4,185",  account: "Client A" },
+  { urgency: "CRITICAL",     sku: "HAMPOHAM-5NAT6090", collection: "HAMPO", color: "Natural", size: "6×9",  pieces: 17, value: "$2,040",  account: "Client A" },
 ];
 
 interface OrderPlanRow {
@@ -1453,7 +1453,7 @@ interface OrderPlanRow {
 }
 
 const ORDER_PLAN: OrderPlanRow[] = [
-  { collection: "CHARS", rev25: "$481,992", priority: "HIGH",   why: "15% of all Quince revenue. Top SKU alone. $132K.",                     action: "Order full range. All sizes especially 8×10 Taupe."     },
+  { collection: "CHARS", rev25: "$481,992", priority: "HIGH",   why: "15% of all Client A revenue. Top SKU alone. $132K.",                     action: "Order full range. All sizes especially 8×10 Taupe."     },
   { collection: "ARCHE", rev25: "$363,845", priority: "HIGH",   why: "2,555 units sold in 2025. +162% Feb 2026.",                             action: "Order Rust colorway in all sizes. 8×10 + 5×8 + 9×12."  },
   { collection: "SIMBA", rev25: "$271,907", priority: "HIGH",   why: "High avg price ($261). Copper 8×10 = $78K alone.",                      action: "Order Copper in 8×10 + 9×12 priority."                  },
   { collection: "OLIVE", rev25: "$265,490", priority: "HIGH",   why: "+169% Feb 2026. Premium avg price ($276).",                             action: "Order Natural in 9×12 + 8×10."                          },
@@ -1468,15 +1468,15 @@ const ORDER_PLAN: OrderPlanRow[] = [
 const STRATEGIC_INSIGHTS = [
   {
     title: "India Supply Chain — Act Now",
-    body:  "96% of Quince volume is India hand-tufted and 22% is India hand-loomed. Lead times from India are typically 90–120 days. To have inventory in warehouse by June for peak season, orders must be placed by February–March at the latest. Any delays risk stockouts during Jul–Nov peak.",
+    body:  "96% of Client A volume is India hand-tufted and 22% is India hand-loomed. Lead times from India are typically 90–120 days. To have inventory in warehouse by June for peak season, orders must be placed by February–March at the latest. Any delays risk stockouts during Jul–Nov peak.",
   },
   {
-    title: "Quince Forecast Discussion",
-    body:  "Quince has no formal quarterly forecast relationship with Momeni yet. At $6.5M annual run rate, this is now critical. Schedule a planning call with Quince to get their 6-month demand forecast. Without it, Momeni is ordering blind for a $6M+ account.",
+    title: "Client A Forecast Discussion",
+    body:  "Client A has no formal quarterly forecast relationship yet. At $6.5M annual run rate, this is now critical. Schedule a planning call with Client A to get their 6-month demand forecast. Without it, we are ordering blind for a $6M+ account.",
   },
   {
     title: "Concentration Risk — Plan B",
-    body:  "Quince is approaching 20% of total Momeni revenue. If Quince reduces orders or delists SKUs, the impact is significant. Use the next 6 months to recover Williams Sonoma, Target, and Mackenzie Childs so the portfolio isn't dependent on one account.",
+    body:  "Client A is approaching 20% of total revenue. If Client A reduces orders or delists SKUs, the impact is significant. Use the next 6 months to recover Client F, Client J, and Client P so the portfolio isn't dependent on one account.",
   },
 ];
 
@@ -1522,7 +1522,7 @@ function WhatToOrderContent() {
         <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-bold text-red-700">
-            9 HAMPO SKUs are OUT OF STOCK right now for Quince. 6 more are CRITICAL.
+            9 HAMPO SKUs are OUT OF STOCK right now for Client A. 6 more are CRITICAL.
           </p>
           <p className="text-xs text-red-600 mt-0.5">
             Total reorder needed: $89,030 across 652 pieces. This must be placed immediately to avoid losing the #1 fastest-growing account.
@@ -1536,28 +1536,28 @@ function WhatToOrderContent() {
           {
             horizon: "Order Now — Within 30 Days",
             value:   "$53,000",
-            detail:  "15 SKUs — Out of Stock + Critical. Mainly HAMPO + TEPPE collections for Quince.",
+            detail:  "15 SKUs — Out of Stock + Critical. Mainly HAMPO + TEPPE collections for Client A.",
             border:  "#dc2626",
             bg:      "#fef2f2",
           },
           {
             horizon: "Order — Within 60 Days",
             value:   "$23,000",
-            detail:  "Top 5 Quince collections (CHARS, ARCHE, SIMBA, OLIVE, JAMES). Build stock before peak season starts.",
+            detail:  "Top 5 Client A collections (CHARS, ARCHE, SIMBA, OLIVE, JAMES). Build stock before peak season starts.",
             border:  "#ea580c",
             bg:      "#fff7ed",
           },
           {
             horizon: "Order — Within 90 Days",
             value:   "$35,000",
-            detail:  "Next-tier Quince collections (CONTO, PASHA, ANDES, WILLO, COVE0). Seasonal buffer for Jul–Nov peak.",
+            detail:  "Next-tier Client A collections (CONTO, PASHA, ANDES, WILLO, COVE0). Seasonal buffer for Jul–Nov peak.",
             border:  "#ca8a04",
             bg:      "#fefce8",
           },
           {
             horizon: "Plan — Next 6 Months",
             value:   "$80,000+",
-            detail:  "Full Quince + Wayfair peak season stock. India hand-tufted 56% of Quince volume — long lead times.",
+            detail:  "Full Client A + Client B peak season stock. India hand-tufted 56% of Client A volume — long lead times.",
             border:  "#16a34a",
             bg:      "#f0fdf4",
           },
@@ -1623,7 +1623,7 @@ function WhatToOrderContent() {
                 <tr style={{ backgroundColor: PRIMARY_DARK }}>
                   {([
                     ["Collection",          "text-left"],
-                    ["2025 Quince Revenue",  "text-right"],
+                    ["2025 Client A Revenue",  "text-right"],
                     ["Priority",            "text-left"],
                     ["Why Order Now",       "text-left"],
                     ["Recommended Action",  "text-left"],
@@ -1703,40 +1703,40 @@ function PlaceholderTab({ label }: { label: string }) {
 
 // ─── Dummy: Winners / Losers ──────────────────────────────────────────────────
 const WINNERS: AccountRow[] = [
-  { rank: 1, account: "Quince",      revenue: "$576,389", yoy: "+1,541%", isUp: true },
-  { rank: 2, account: "Fred Meyer",  revenue: "$152,079", yoy: "+715%",   isUp: true },
-  { rank: 3, account: "HG Buying",   revenue: "$121,530", yoy: "+259%",   isUp: true },
-  { rank: 4, account: "Overstock",   revenue: "$141,411", yoy: "+46%",    isUp: true },
-  { rank: 5, account: "Wayfair",     revenue: "$485,262", yoy: "+23%",    isUp: true },
-  { rank: 6, account: "Rugs Direct", revenue: "$163,366", yoy: "+30%",    isUp: true },
+  { rank: 1, account: "Client A", revenue: "$576,389", yoy: "+1,541%", isUp: true },
+  { rank: 2, account: "Client D", revenue: "$152,079", yoy: "+715%",   isUp: true },
+  { rank: 3, account: "Client G", revenue: "$121,530", yoy: "+259%",   isUp: true },
+  { rank: 4, account: "Client E", revenue: "$141,411", yoy: "+46%",    isUp: true },
+  { rank: 5, account: "Client B", revenue: "$485,262", yoy: "+23%",    isUp: true },
+  { rank: 6, account: "Client C", revenue: "$163,366", yoy: "+30%",    isUp: true },
 ];
 
 const LOSERS: AccountRow[] = [
-  { rank: 1, account: "Mackenzie Childs",   revenue: "$9,727",   yoy: "-75%", isUp: false },
-  { rank: 2, account: "Target",             revenue: "$33,478",  yoy: "-60%", isUp: false },
-  { rank: 3, account: "Williams Sonoma",    revenue: "$123,827", yoy: "-42%", isUp: false },
-  { rank: 4, account: "Lulu & Georgia",     revenue: "$37,998",  yoy: "-22%", isUp: false },
-  { rank: 5, account: "Walmart",            revenue: "$14,953",  yoy: "-19%", isUp: false },
-  { rank: 6, account: "Nebraska Furn. Mart",revenue: "$4,739",   yoy: "-52%", isUp: false },
+  { rank: 1, account: "Client P", revenue: "$9,727",   yoy: "-75%", isUp: false },
+  { rank: 2, account: "Client J", revenue: "$33,478",  yoy: "-60%", isUp: false },
+  { rank: 3, account: "Client F", revenue: "$123,827", yoy: "-42%", isUp: false },
+  { rank: 4, account: "Client H", revenue: "$37,998",  yoy: "-22%", isUp: false },
+  { rank: 5, account: "Client M", revenue: "$14,953",  yoy: "-19%", isUp: false },
+  { rank: 6, account: "Client Q", revenue: "$4,739",   yoy: "-52%", isUp: false },
 ];
 
 // ─── Dummy: Key Insights ──────────────────────────────────────────────────────
 const INSIGHTS: InsightCardProps[] = [
   {
-    title: "Quince Overtook Wayfair in February",
-    body:  "For the first time, Quince ($576K) surpassed Wayfair ($485K) as Momeni's #1 revenue account in a single month. Quince did not exist as a customer in 2024. In 12 months it has become our most important growth driver.",
+    title: "Client A Overtook Client B in February",
+    body:  "For the first time, Client A ($576K) surpassed Client B ($485K) as the #1 revenue account in a single month. Client A did not exist as a customer in 2024. In 12 months it has become the most important growth driver.",
   },
   {
     title: "New Channels Opening Up",
-    body:  "TJ Maxx.com ($23.6K), Marshalls.com ($14.2K), and Ramble Market ($34.3K) all had zero revenue in Feb 2025. These are brand new channels adding meaningful volume in 2026.",
+    body:  "Client K ($23.6K), Client N ($14.2K), and Client I ($34.3K) all had zero revenue in Feb 2025. These are brand new channels adding meaningful volume in 2026.",
   },
   {
-    title: "Williams Sonoma & Target Are Declining",
-    body:  "Williams Sonoma is down 42% and Target down 60% vs last February. These were historically top 5 accounts. Sales team should prioritize understanding why and recovering these relationships.",
+    title: "Client F & Client J Are Declining",
+    body:  "Client F is down 42% and Client J down 60% vs last February. These were historically top 5 accounts. Sales team should prioritize understanding why and recovering these relationships.",
   },
   {
     title: "Revenue Recovery on Track",
-    body:  "After declining from a $32.3M peak in 2021 to $26.9M in 2024, full-year 2025 recovered to $28.5M. 2026 YTD pace (~$29M annualized) continues that recovery, led almost entirely by Quince.",
+    body:  "After declining from a $32.3M peak in 2021 to $26.9M in 2024, full-year 2025 recovered to $28.5M. 2026 YTD pace (~$29M annualized) continues that recovery, led almost entirely by Client A.",
   },
 ];
 
@@ -1800,9 +1800,9 @@ function OverviewContent({ appliedYear, appliedMonth, appliedCompYear, appliedCo
             Inventory Alert — Action Required Now
           </p>
           <p className="text-xs text-red-600 mt-1 leading-relaxed">
-            <strong>9 Quince SKUs are out of stock</strong> (mainly HAMPO collection) and{" "}
+            <strong>9 Client A SKUs are out of stock</strong> (mainly HAMPO collection) and{" "}
             <strong>6 more are critical</strong>. Total reorder needed: $89,030 across 652 pieces.
-            Quince is the #1 fastest-growing account — stockouts here are high-risk.{" "}
+            Client A is the #1 fastest-growing account — stockouts here are high-risk.{" "}
             <span className="font-semibold">See the "What to Order" tab for the full list.</span>
           </p>
         </div>
