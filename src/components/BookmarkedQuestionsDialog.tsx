@@ -27,7 +27,7 @@ export default function BookmarkedQuestionsDialog({ onSelectQuestion, refreshTri
       setBookmarks(data);
     } catch (err) {
       console.error("[BookmarkedQuestionsDialog] Load error:", err);
-      toast({ title: "Error loading bookmarks", description: String(err), variant: "destructive" });
+      toast({ title: "Sign In Required Again" });
     } finally {
       setLoading(false);
     }

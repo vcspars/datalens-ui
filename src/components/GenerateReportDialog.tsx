@@ -60,7 +60,7 @@ export default function GenerateReportDialog({ items, onGenerate }: GenerateRepo
       await onGenerate(reportName, selectedItems, instructions);
       toast({
         title: "Success",
-        description: "Report is generated successfully. View in My Reports section.",
+        description: "Report generation started. Track it in the My Reports section.",
       });
       setOpen(false);
       // Reset form

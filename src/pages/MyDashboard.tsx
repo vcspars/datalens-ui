@@ -26,8 +26,7 @@ import {
   getDashboardReports,
   deleteDashboardItem,
   deleteDashboardReport,
-  streamGenerateReport,
-  saveDashboardReport,
+  startReportGeneration,
   downloadDashboardReportPdf,
   type DashboardItemOut,
 } from "@/lib/api";
@@ -39,6 +38,12 @@ function parseSSELine(line: string): { type: string; [key: string]: unknown } | 
   const t = line.trim();
   if (!t.startsWith("data: ")) return null;
   try { return JSON.parse(t.slice(6)); } catch { return null; }
+}
+
+/** Background-generation status of a report ("done" for legacy reports without a status). */
+function reportStatus(r: DashboardItemOut): "generating" | "failed" | "done" {
+  const s = r.metadata?.["status"];
+  return s === "generating" || s === "failed" ? s : "done";
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +109,9 @@ export default function MyDashboard() {
   const { toast } = useToast();
   const [items, setItems] = useState<DashboardItemOut[]>([]);
   const [reports, setReports] = useState<DashboardItemOut[]>([]);
+  const reportsRef = useRef<DashboardItemOut[]>([]);
+  reportsRef.current = reports;
+  const [activeTab, setActiveTab] = useState<string>("items");
   const [loading, setLoading] = useState(true);
   const [viewReport, setViewReport] = useState<DashboardItemOut | null>(null);
   const [metaItem, setMetaItem] = useState<DashboardItemOut | null>(null);
@@ -160,56 +168,53 @@ export default function MyDashboard() {
     }
   };
 
-  // Called by GenerateReportDialog — streams and saves the report
+  // Quietly refresh only the reports list (no full-page spinner)
+  const refreshReports = async () => {
+    try {
+      const fetched = await getDashboardReports();
+      // Toast when a report transitions from generating -> done/failed
+      reportsRef.current.forEach((p) => {
+        if (reportStatus(p) !== "generating") return;
+        const now = fetched.find((r) => r.id === p.id);
+        if (now && reportStatus(now) === "done") {
+          toast({ title: "Report ready", description: `"${now.name}" is ready to preview and download.` });
+        } else if (now && reportStatus(now) === "failed") {
+          toast({ title: "Report failed", description: `"${now.name}" could not be generated.`, variant: "destructive" });
+        }
+      });
+      reportsRef.current = fetched;
+      setReports(fetched);
+    } catch (err) {
+      console.warn("[MyDashboard] Reports refresh skipped:", err);
+    }
+  };
+
+  // Called by GenerateReportDialog — starts background generation and returns immediately.
+  // The server keeps generating even if the page is reloaded or the user does other things.
   const handleGenerateReport = async (
     reportName: string,
     selectedItemIds: string[],
     instructions: string,
   ) => {
-    console.log("[MyDashboard] Generating report:", reportName, "items:", selectedItemIds);
-    const reader = await streamGenerateReport({
+    console.log("[MyDashboard] Starting background report:", reportName, "items:", selectedItemIds);
+    await startReportGeneration({
       name: reportName,
       item_ids: selectedItemIds,
       template: "executive",
       prompt: instructions,
     });
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let accumulated = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        const event = parseSSELine(line);
-        if (!event) continue;
-        if (event.type === "token") {
-          accumulated += event.content as string;
-        } else if (event.type === "done") {
-          accumulated = (event.full_report as string) || accumulated;
-        } else if (event.type === "error") {
-          throw new Error(event.content as string);
-        }
-      }
-    }
-
-    if (accumulated) {
-      await saveDashboardReport({
-        name: reportName,
-        content: accumulated,
-        template: "executive",
-        item_ids: selectedItemIds,
-      });
-      console.log("[MyDashboard] Report saved:", reportName);
-      await loadData();
-    }
+    setActiveTab("reports");
+    await refreshReports();
   };
+
+  // Poll while any report is still generating
+  const hasGeneratingReports = reports.some((r) => reportStatus(r) === "generating");
+  useEffect(() => {
+    if (!hasGeneratingReports) return;
+    const id = setInterval(() => void refreshReports(), 2000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasGeneratingReports]);
 
   // Derive report items for GenerateReportDialog
   const reportItems = items.map((item) => ({
@@ -335,7 +340,7 @@ export default function MyDashboard() {
           </div>
         </div>
 
-        <Tabs defaultValue="items" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between gap-3">
             <TabsList>
               <TabsTrigger value="items">
@@ -548,7 +553,48 @@ export default function MyDashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {reports.map((report) => (
+                {reports.map((report) => {
+                  const status = reportStatus(report);
+                  if (status !== "done") {
+                    return (
+                      <Card key={report.id} className="group border-dashed">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="truncate">{report.name}</span>
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            {new Date(report.created_at).toLocaleDateString()}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-col gap-3">
+                            {status === "generating" ? (
+                              <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                <span>Generating report…</span>
+                              </div>
+                            ) : (
+                              <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+                                Generation failed
+                                {report.metadata?.["error"] ? `: ${String(report.metadata["error"])}` : "."}
+                              </div>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteReport(report.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              {status === "generating" ? "Cancel" : "Delete"}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  }
+                  return (
                   <Card key={report.id} className="group">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
@@ -608,7 +654,8 @@ export default function MyDashboard() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </TabsContent>

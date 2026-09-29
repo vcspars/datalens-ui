@@ -528,6 +528,20 @@ export const saveDashboardReport = async (payload: {
   });
 };
 
+/** Start background report generation; returns immediately with a placeholder report id. */
+export const startReportGeneration = async (payload: {
+  name: string;
+  item_ids: string[];
+  template: string;
+  prompt: string;
+}): Promise<{ id: string; status: string }> => {
+  console.log("[API] startReportGeneration:", payload.name);
+  return apiRequest<{ id: string; status: string }>("/dashboard/reports/generate-async", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
 export const downloadDashboardReportPdf = async (reportId: string): Promise<Blob> => {
   const token = getAuthToken();
   console.log("[API] downloadDashboardReportPdf:", reportId);
