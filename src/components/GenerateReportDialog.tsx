@@ -166,7 +166,7 @@ export default function GenerateReportDialog({ items, onGenerate }: GenerateRepo
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="instructions">Report Instructions *</Label>
+            <Label htmlFor="instructions">Instructions (optional)</Label>
             <Textarea
               id="instructions"
               placeholder="Provide any specific instructions for the report generation. E.g., 'Include executive summary, focus on trends, highlight key insights from the selected graphs and tables...'"

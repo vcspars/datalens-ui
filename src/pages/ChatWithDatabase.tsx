@@ -49,6 +49,7 @@ import {
 import {
   getChatHistory,
   getChatPending,
+  type ChatPendingResponse,
   cancelChatGeneration,
   streamChat,
   saveDashboardTable,
@@ -412,7 +413,9 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     pendingUserMessageIdRef.current = null;
     setMessages((prev) => {
       let next = prev.filter(
-        (m) => m.id !== "pending-thinking" && !(m.isStreaming && !m.content?.trim()),
+        (m) =>
+          m.id !== "pending-thinking" &&
+          !(m.role === "assistant" && m.id !== "welcome" && !m.content?.trim() && !m.has_table),
       );
       if (q) {
         for (let i = next.length - 1; i >= 0; i--) {
@@ -533,7 +536,13 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     const load = async () => {
       console.log("[ChatPanel] Loading chat history...");
       try {
-        const [data, pending] = await Promise.all([getChatHistory(), getChatPending()]);
+        const [data, pending] = await Promise.all([
+          getChatHistory(),
+          getChatPending().catch((e): ChatPendingResponse => {
+            console.warn("[ChatPanel] getChatPending failed, assuming idle:", e);
+            return { active: false };
+          }),
+        ]);
         console.log(`[ChatPanel] Loaded ${data.messages.length} history messages`);
         const welcome: Message = {
           id: "welcome",
