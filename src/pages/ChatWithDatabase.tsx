@@ -60,6 +60,7 @@ import {
   streamDbQuestions,
   streamDbReport,
   getDbOverview,
+  getDbGenerationStatus,
   clearDbOverview,
   getDbGraphs,
   saveDbGraphs,
@@ -1490,21 +1491,74 @@ function DatabaseTabs({
     console.log("[DatabaseTabs] Loading persisted DB overview from DB...");
     getDbOverview()
       .then((overview) => {
-        if (overview.summary) {
+        if (overview.summary && !genActiveRef.current.summary) {
           console.log("[DatabaseTabs] Restored summary from DB");
           setSummaryText(overview.summary);
         }
-        if (overview.questions?.length) {
+        if (overview.questions?.length && !genActiveRef.current.questions) {
           console.log("[DatabaseTabs] Restored", overview.questions.length, "questions from DB");
           setQuestions(overview.questions);
         }
-        if (overview.report) {
+        if (overview.report && !genActiveRef.current.report) {
           console.log("[DatabaseTabs] Restored report from DB");
           setReportText(overview.report);
         }
       })
       .catch((err) => console.warn("[DatabaseTabs] Could not load overview:", err));
   }, []);
+
+  // Resume after reload: if the backend is still generating summary/questions/report,
+  // show the loading state (and partial text), then load the saved result when done.
+  const [resumePolling, setResumePolling] = useState(false);
+  const genActiveRef = useRef({ summary: false, questions: false, report: false });
+  useEffect(() => {
+    let cancelled = false;
+    getDbGenerationStatus()
+      .then((s) => {
+        if (!cancelled && (s.summary.active || s.questions.active || s.report.active)) {
+          setResumePolling(true);
+        }
+      })
+      .catch((err) => console.warn("[DatabaseTabs] Could not load generation status:", err));
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!resumePolling) return;
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const s = await getDbGenerationStatus();
+        if (stopped) return;
+        genActiveRef.current = {
+          summary: s.summary.active,
+          questions: s.questions.active,
+          report: s.report.active,
+        };
+        setIsGeneratingSummary(s.summary.active);
+        setIsGeneratingQuestions(s.questions.active);
+        setIsGeneratingReport(s.report.active);
+        // While generating, show partial text or clear the stale saved copy
+        // (same as clicking Regenerate) so the loading state is visible.
+        if (s.summary.active) setSummaryText(s.summary.partial || "");
+        if (s.questions.active) setQuestions([]);
+        if (s.report.active) setReportText(s.report.partial || "");
+        if (!s.summary.active && !s.questions.active && !s.report.active) {
+          const overview = await getDbOverview();
+          if (stopped) return;
+          if (overview.summary) setSummaryText(overview.summary);
+          if (overview.questions?.length) setQuestions(overview.questions);
+          if (overview.report) setReportText(overview.report);
+          setResumePolling(false);
+        }
+      } catch (err) {
+        console.warn("[DatabaseTabs] Generation status poll skipped:", err);
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), 1000);
+    return () => { stopped = true; clearInterval(id); };
+  }, [resumePolling]);
 
   const handleSendQuestion = (question: string) => {
     console.log("[DatabaseTabs] Sending question to chat:", question);

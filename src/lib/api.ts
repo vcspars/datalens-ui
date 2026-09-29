@@ -287,6 +287,16 @@ export const getDbOverview = async (): Promise<DbOverview> => {
   return apiRequest<DbOverview>("/chat/db/overview");
 };
 
+export interface DbGenerationStatus {
+  summary: { active: boolean; partial: string };
+  questions: { active: boolean; partial: string };
+  report: { active: boolean; partial: string };
+}
+
+export const getDbGenerationStatus = async (): Promise<DbGenerationStatus> => {
+  return apiRequest<DbGenerationStatus>("/chat/db/status");
+};
+
 export const clearDbOverview = async (): Promise<void> => {
   console.log("[API] clearDbOverview");
   await apiRequest<void>("/chat/db/overview", { method: "DELETE" });
