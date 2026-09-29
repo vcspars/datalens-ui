@@ -17,6 +17,7 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import Header from "@/components/Header";
 import MarkdownMessage from "@/components/MarkdownMessage";
 import GraphPreview from "@/components/GraphPreview";
+import InlineCharts, { type ChartSpec } from "@/components/InlineCharts";
 import SaveNameModal from "@/components/SaveNameModal";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,6 +92,8 @@ interface Message {
   table_columns?: string[];
   // All tables parsed from this message
   tables?: TableEntry[];
+  /** Agent-proposed charts to render inline under the response */
+  charts?: ChartSpec[];
   /** Generated SQL for this response (from Vanna or LangChain) */
   sql_query?: string;
 }
@@ -434,6 +437,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     table_data: [] as Record<string, string>[],
     table_columns: [] as string[],
     tables: [] as TableEntry[],
+    charts: [] as ChartSpec[],
     sql_query: "",
   });
 
@@ -559,6 +563,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             table_data: m.table_data as Record<string, string>[],
             table_columns: m.table_columns,
             tables: m.tables as TableEntry[] | undefined,
+            charts: m.charts as ChartSpec[] | undefined,
             sql_query: m.sql_query,
           }));
 
@@ -672,6 +677,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         table_data: m.table_data as Record<string, string>[],
         table_columns: m.table_columns,
         tables: m.tables as TableEntry[] | undefined,
+        charts: m.charts as ChartSpec[] | undefined,
         sql_query: m.sql_query,
         ...(stillPending && idx === assistantIdx ? { isStreaming: true } : {}),
       }));
@@ -798,6 +804,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
       table_data: [],
       table_columns: [],
       tables: [],
+      charts: [],
       sql_query: "",
     };
     setIsLoading(true);
@@ -812,6 +819,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     let tableData: Record<string, string>[] = [];
     let tableColumns: string[] = [];
     let allTables: TableEntry[] = [];
+    let charts: ChartSpec[] = [];
     let sqlQuery = "";
 
     try {
@@ -850,15 +858,17 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             tableData = (event.table_data as Record<string, string>[]) || [];
             tableColumns = (event.table_columns as string[]) || [];
             allTables = (event.tables as TableEntry[]) || [];
+            charts = (event.charts as ChartSpec[]) || [];
             sqlQuery = (event.sql_query as string) || "";
             streamMetaRef.current = {
               has_table: hasTable,
               table_data: tableData,
               table_columns: tableColumns,
               tables: allTables,
+              charts: charts,
               sql_query: sqlQuery,
             };
-            console.log(`[ChatPanel] Done | has_table=${hasTable} | tables=${allTables.length} | sql_query=${!!sqlQuery}`);
+            console.log(`[ChatPanel] Done | has_table=${hasTable} | tables=${allTables.length} | charts=${charts.length} | sql_query=${!!sqlQuery}`);
           } else if (event.type === "saved") {
             // Backend confirmed the assistant message was persisted
             const dbId = event.assistant_db_id as string;
@@ -878,7 +888,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
 
       setMessages(prev => prev.map(m =>
         m.id === assistantId
-          ? { ...m, content: fullContent, isStreaming: false, has_table: hasTable, table_data: tableData, table_columns: tableColumns, tables: allTables, sql_query: sqlQuery || undefined }
+          ? { ...m, content: fullContent, isStreaming: false, has_table: hasTable, table_data: tableData, table_columns: tableColumns, tables: allTables, charts: charts, sql_query: sqlQuery || undefined }
           : m
       ));
     } catch (err) {
@@ -904,6 +914,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                   table_data: meta.table_data,
                   table_columns: meta.table_columns,
                   tables: meta.tables,
+                  charts: meta.charts,
                   sql_query: meta.sql_query || undefined,
                 }
               : m
@@ -976,6 +987,7 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
             table_data: meta.table_data,
             table_columns: meta.table_columns,
             tables: meta.tables,
+            charts: meta.charts,
             sql_query: meta.sql_query || undefined,
           };
         }),
@@ -1193,6 +1205,10 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                               <Loader2 className="h-3.5 w-3.5 xl:h-4 xl:w-4 animate-spin flex-shrink-0" />
                               Thinking…
                             </span>
+                          )}
+                          {/* Agent-proposed charts render below the narrative once streaming completes */}
+                          {!message.isStreaming && message.role === "assistant" && message.charts && message.charts.length > 0 && (
+                            <InlineCharts charts={message.charts} tables={message.tables} />
                           )}
                           {/* Blinking cursor while streaming and we already have content */}
                           {message.isStreaming && message.content && (

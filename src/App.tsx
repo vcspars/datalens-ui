@@ -12,6 +12,7 @@ import Privacy from "./pages/Privacy";
 import ChatWithDatabase from "./pages/ChatWithDatabase";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import MyDashboard from "./pages/MyDashboard";
+import UsageCosts from "./pages/UsageCosts";
 import Help from "./pages/Help";
 import Auth from "./pages/Auth";
 import DirectQueryTester from "./pages/DirectQueryTester";
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/chat" element={<ChatWithDatabase />} />
             <Route path="/executive-dashboard" element={<ExecutiveDashboard />} />
             <Route path="/my-dashboard" element={<MyDashboard />} />
+            <Route path="/usage" element={<UsageCosts />} />
 
             {/* Redirect old dataset/dashboard routes */}
             <Route path="/my-datasets" element={<Navigate to="/chat" replace />} />

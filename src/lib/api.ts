@@ -138,6 +138,8 @@ export interface UserResponse {
   email: string;
   full_name: string;
   role: string;
+  preferred_provider?: string | null;
+  preferred_model?: string | null;
 }
 
 export const signup = async (data: SignupRequest): Promise<TokenResponse> => {
@@ -179,6 +181,7 @@ export interface ChatMessageItem {
   table_data: Record<string, string>[];
   table_columns: string[];
   tables?: { columns: string[]; data: Record<string, string>[] }[];
+  charts?: { type: string; tableIndex: number; xKey: string; yKey: string; title?: string }[];
   sql_query?: string;
   created_at: string;
 }
@@ -637,4 +640,90 @@ export const getDatasets = async (): Promise<DatasetResponse[]> => {
 
 export const deleteDataset = async (id: string): Promise<void> => {
   await apiRequest<void>(`/datasets/${id}`, { method: "DELETE" });
+};
+
+// ---------------------------------------------------------------------------
+// OpenRouter model catalog + per-user preference + usage/cost tracking
+// ---------------------------------------------------------------------------
+
+export interface ModelCatalogEntry {
+  id: string;
+  name: string;
+  provider: string;
+  context_length?: number;
+  free: boolean;
+}
+
+export interface ModelCatalogResponse {
+  openrouter_enabled: boolean;
+  models: ModelCatalogEntry[];
+}
+
+/** Returns { openrouter_enabled: false, models: [] } when the admin hasn't
+ * turned OpenRouter on — callers should hide the model picker entirely then. */
+export const getModelCatalog = async (): Promise<ModelCatalogResponse> => {
+  console.log("[API] getModelCatalog");
+  return apiRequest<ModelCatalogResponse>("/models/catalog");
+};
+
+export const updateModelPreference = async (
+  provider: string,
+  model: string
+): Promise<UserResponse> => {
+  console.log("[API] updateModelPreference:", provider, model);
+  return apiRequest<UserResponse>("/auth/model-preference", {
+    method: "PUT",
+    body: JSON.stringify({ provider, model }),
+  });
+};
+
+export interface UsageQueryItem {
+  user_message_id: string;
+  question: string;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  step_count: number;
+  created_at: string | null;
+}
+
+export interface UsageQueriesResponse {
+  items: UsageQueryItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const getUsageQueries = async (
+  limit = 50,
+  offset = 0
+): Promise<UsageQueriesResponse> => {
+  console.log("[API] getUsageQueries", { limit, offset });
+  return apiRequest<UsageQueriesResponse>(`/usage/queries?limit=${limit}&offset=${offset}`);
+};
+
+export interface UsageStepItem {
+  step: string;
+  provider: string;
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  created_at: string | null;
+}
+
+export interface UsageStepsResponse {
+  user_message_id: string;
+  steps: UsageStepItem[];
+  total_tokens: number;
+  total_cost_usd: number;
+}
+
+export const getUsageStepsForQuery = async (
+  userMessageId: string
+): Promise<UsageStepsResponse> => {
+  console.log("[API] getUsageStepsForQuery:", userMessageId);
+  return apiRequest<UsageStepsResponse>(`/usage/queries/${encodeURIComponent(userMessageId)}/steps`);
 };

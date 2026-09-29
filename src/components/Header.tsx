@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, HelpCircle, LogOut, Sun, Moon, ChevronDown, User, MessageSquare, BarChart2 } from "lucide-react";
+import { LayoutDashboard, HelpCircle, LogOut, Sun, Moon, ChevronDown, User, MessageSquare, BarChart2, Cpu, Receipt } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,8 +11,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getCurrentUser, logout, UserResponse } from "@/lib/api";
+import {
+  getCurrentUser,
+  logout,
+  UserResponse,
+  getModelCatalog,
+  updateModelPreference,
+  ModelCatalogEntry,
+} from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 const USER_CACHE_KEY = "spars_user_cache";
 
@@ -34,6 +51,14 @@ export default function Header() {
   // Initialise from cache so nav buttons never flash-disappear between pages
   const [user, setUser] = useState<UserResponse | null>(getCachedUser);
 
+  // OpenRouter model picker — only rendered when the admin has enabled it
+  // server-side (/api/models/catalog reports openrouter_enabled: true).
+  // Stays hidden entirely otherwise, so the header is unchanged by default.
+  const [modelCatalogEnabled, setModelCatalogEnabled] = useState(false);
+  const [models, setModels] = useState<ModelCatalogEntry[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [savingModel, setSavingModel] = useState(false);
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -41,6 +66,7 @@ export default function Header() {
         const userData = await getCurrentUser();
         sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
         setUser(userData);
+        setSelectedModel(userData.preferred_model || null);
         console.log("[Header] User loaded:", userData.full_name);
       } catch (error) {
         console.log("[Header] User not logged in or token expired");
@@ -50,6 +76,51 @@ export default function Header() {
     };
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchCatalog = async () => {
+      try {
+        const catalog = await getModelCatalog();
+        setModelCatalogEnabled(catalog.openrouter_enabled);
+        setModels(catalog.models);
+      } catch (error) {
+        console.log("[Header] Model catalog unavailable:", error);
+        setModelCatalogEnabled(false);
+      }
+    };
+    fetchCatalog();
+  }, [user]);
+
+  const modelsByProvider = useMemo(() => {
+    const grouped = new Map<string, ModelCatalogEntry[]>();
+    for (const m of models) {
+      const list = grouped.get(m.provider) || [];
+      list.push(m);
+      grouped.set(m.provider, list);
+    }
+    return grouped;
+  }, [models]);
+
+  const handleModelChange = async (modelId: string) => {
+    const previous = selectedModel;
+    setSelectedModel(modelId);
+    setSavingModel(true);
+    try {
+      await updateModelPreference("openrouter", modelId);
+      console.log("[Header] Model preference updated:", modelId);
+    } catch (error) {
+      console.log("[Header] Failed to update model preference:", error);
+      setSelectedModel(previous);
+      toast({
+        title: "Couldn't change model",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingModel(false);
+    }
+  };
 
   const handleLogout = () => {
     console.log("[Header] Logging out user");
@@ -141,6 +212,30 @@ export default function Header() {
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
 
+        {modelCatalogEnabled && models.length > 0 && (
+          <Select value={selectedModel ?? undefined} onValueChange={handleModelChange} disabled={savingModel}>
+            <SelectTrigger className="h-9 w-[180px] text-xs gap-1.5 hidden md:flex">
+              <Cpu className="h-3.5 w-3.5 shrink-0 opacity-70" />
+              <SelectValue placeholder="Choose a model" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {Array.from(modelsByProvider.entries()).map(([provider, list]) => (
+                <SelectGroup key={provider}>
+                  <SelectLabel>{provider}</SelectLabel>
+                  {list.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <span className="flex items-center gap-2">
+                        <span>{m.name}</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">free</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         {user && user.role && (
           <span className={`hidden sm:inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getRoleBadge(user.role).color}`}>
             {getRoleBadge(user.role).label}
@@ -170,6 +265,11 @@ export default function Header() {
                   )}
                 </div>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/usage")} className="cursor-pointer">
+                <Receipt className="h-4 w-4 mr-2" />
+                Usage &amp; Cost
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                 <LogOut className="h-4 w-4 mr-2" />

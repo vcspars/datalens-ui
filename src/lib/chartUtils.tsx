@@ -146,6 +146,8 @@ export interface RenderChartOptions {
   noLegendScroll?: boolean;
   /** When set (e.g. 12), legend items are laid out in columns with this many rows per column; overflow goes to columns to the right. */
   legendColumns?: number;
+  /** When true, bar/scatter points cycle through the color palette (one color per data point) instead of a single flat color. */
+  multiColor?: boolean;
 }
 
 export function renderChart(
@@ -170,7 +172,11 @@ export function renderChart(
           <YAxis tick={{ fontSize: 11 }} tickFormatter={axisTickFormatter} />
           <Tooltip formatter={tooltipFormatter} />
           <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
-          <Bar dataKey={yKey} fill={colors[0]} radius={[4, 4, 0, 0]} />
+          <Bar dataKey={yKey} fill={colors[0]} radius={[4, 4, 0, 0]}>
+            {options?.multiColor
+              ? data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)
+              : null}
+          </Bar>
         </BarChart>
       );
     case "line":
@@ -240,7 +246,11 @@ export function renderChart(
           <YAxis dataKey={yKey} name={yKey} tick={{ fontSize: 11 }} tickFormatter={axisTickFormatter} />
           <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={tooltipFormatter} />
           <Legend wrapperStyle={{ marginTop: 16 }} formatter={legendFormatter} />
-          <Scatter data={data} fill={colors[0]} />
+          <Scatter data={data} fill={colors[0]}>
+            {options?.multiColor
+              ? data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)
+              : null}
+          </Scatter>
         </ScatterChart>
       );
     default:
