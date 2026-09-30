@@ -117,16 +117,16 @@ export default function BookmarkedQuestionsDialog({ onSelectQuestion, refreshTri
                       size="icon"
                       variant="ghost"
                       onClick={() => handleSend(item.question)}
-                      className="h-8 w-8"
+                      className="group/send h-8 w-8 hover:bg-primary/10 dark:hover:bg-primary/25"
                       title="Send to chat"
                     >
-                      <Send className="h-4 w-4 text-primary" />
+                      <Send className="h-4 w-4 text-primary transition-colors group-hover/send:text-primary-hover dark:text-sky-400 dark:group-hover/send:text-sky-300" />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => handleDelete(item.id)}
-                      className="h-8 w-8"
+                      className="h-8 w-8 hover:bg-destructive/10"
                       title="Delete bookmark"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />

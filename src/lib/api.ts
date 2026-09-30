@@ -188,10 +188,15 @@ export interface ChatHistoryResponse {
   session_id: string;
 }
 
-export const getChatHistory = async (opts?: { bustCache?: boolean }): Promise<ChatHistoryResponse> => {
-  const suffix = opts?.bustCache ? `?_=${Date.now()}` : "";
+export const getChatHistory = async (
+  opts?: { bustCache?: boolean; limit?: number },
+): Promise<ChatHistoryResponse> => {
+  const params = new URLSearchParams();
+  if (opts?.bustCache) params.set("_", String(Date.now()));
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString();
   console.log("[API] getChatHistory");
-  return apiRequest<ChatHistoryResponse>(`/chat/history${suffix}`);
+  return apiRequest<ChatHistoryResponse>(`/chat/history${qs ? `?${qs}` : ""}`);
 };
 
 export interface ChatPendingResponse {

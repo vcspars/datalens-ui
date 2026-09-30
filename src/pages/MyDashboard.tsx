@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import GenerateReportDialog from "@/components/GenerateReportDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { renderChart, CHART_COLORS, type GraphType } from "@/lib/chartUtils";
 import {
   BarChart3, Table2, FileText, Trash2, Eye, Download, Loader2, RefreshCw, Info, Maximize2, FileDown,
@@ -117,6 +118,10 @@ export default function MyDashboard() {
   const [metaItem, setMetaItem] = useState<DashboardItemOut | null>(null);
   const [previewItem, setPreviewItem] = useState<DashboardItemOut | null>(null);
   const [exportItem, setExportItem] = useState<DashboardItemOut | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: "item" | "report"; id: string; name: string; generating?: boolean } | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const exportChartRef = useRef<HTMLDivElement>(null);
 
   const [itemTypeFilter, setItemTypeFilter] = useState<"all" | "table" | "graph">("all");
@@ -144,27 +149,43 @@ export default function MyDashboard() {
 
   useEffect(() => { loadData(); }, []);
 
-  const handleDeleteItem = async (id: string) => {
-    if (!confirm("Delete this item from your dashboard?")) return;
-    console.log("[MyDashboard] Deleting item:", id);
-    try {
-      await deleteDashboardItem(id);
-      setItems((prev) => prev.filter((i) => i.id !== id));
-      toast({ title: "Deleted", description: "Item removed from dashboard." });
-    } catch (err) {
-      toast({ title: "Error", description: String(err), variant: "destructive" });
-    }
+  // Delete requests open the confirmation popup; the actual delete runs on confirm.
+  const handleDeleteItem = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    setDeleteTarget({ kind: "item", id, name: item?.name ?? "this item" });
   };
 
-  const handleDeleteReport = async (id: string) => {
-    if (!confirm("Delete this report?")) return;
-    console.log("[MyDashboard] Deleting report:", id);
+  const handleDeleteReport = (id: string) => {
+    const report = reports.find((r) => r.id === id);
+    setDeleteTarget({
+      kind: "report",
+      id,
+      name: report?.name ?? "this report",
+      generating: report ? reportStatus(report) === "generating" : false,
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setIsDeleting(true);
     try {
-      await deleteDashboardReport(id);
-      setReports((prev) => prev.filter((r) => r.id !== id));
-      toast({ title: "Deleted", description: "Report removed." });
+      if (target.kind === "item") {
+        console.log("[MyDashboard] Deleting item:", target.id);
+        await deleteDashboardItem(target.id);
+        setItems((prev) => prev.filter((i) => i.id !== target.id));
+        toast({ title: "Deleted", description: "Item removed from dashboard." });
+      } else {
+        console.log("[MyDashboard] Deleting report:", target.id);
+        await deleteDashboardReport(target.id);
+        setReports((prev) => prev.filter((r) => r.id !== target.id));
+        toast({ title: "Deleted", description: "Report removed." });
+      }
+      setDeleteTarget(null);
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -662,6 +683,35 @@ export default function MyDashboard() {
         </Tabs>
       </div>
       </div>{/* end scroll wrapper */}
+
+      {/* Delete confirmation popup */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        loading={isDeleting}
+        title={
+          deleteTarget?.kind === "report"
+            ? deleteTarget.generating
+              ? "Cancel report generation?"
+              : "Delete this report?"
+            : "Delete this item?"
+        }
+        description={
+          deleteTarget ? (
+            <>
+              <span className="font-medium text-foreground break-words">{deleteTarget.name}</span>{" "}
+              {deleteTarget.kind === "report" && deleteTarget.generating
+                ? "is still being generated. Cancelling will discard it."
+                : deleteTarget.kind === "report"
+                  ? "will be permanently removed from My Reports. This action cannot be undone."
+                  : "will be permanently removed from your dashboard. This action cannot be undone."}
+            </>
+          ) : null
+        }
+        confirmLabel={deleteTarget?.generating ? "Cancel report" : "Delete"}
+        cancelLabel={deleteTarget?.generating ? "Keep generating" : "Cancel"}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       {/* View Report Modal */}
       <ViewReportModal

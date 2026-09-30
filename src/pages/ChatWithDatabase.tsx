@@ -39,12 +39,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import BookmarkedQuestionsDialog from "@/components/BookmarkedQuestionsDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
   Send, Mic, MicOff, Loader2, Star, Maximize2, Minimize2,
   User, Copy, Check, BookmarkPlus, BarChart3, Sparkles, Download, Trash2,
-  StopCircle,
+  StopCircle, MoreVertical, FileSpreadsheet,
 } from "lucide-react";
 import {
   getChatHistory,
@@ -347,10 +355,36 @@ interface ChatPanelProps {
   onOpenConvertDialog: (msg: Message, sourcePrompt: string) => void;
   onSaveToDashboard: (msg: Message, name: string, tableIndexOrAll: number | "all" | undefined, sourcePrompt: string) => void | Promise<void>;
   onSwitchToGraphTab: () => void;
+  /** A suggested question clicked while the chat was hidden; sent once the panel has mounted. */
+  queuedQuestion?: string | null;
+  onQueuedQuestionConsumed?: () => void;
 }
 
-function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSaveToDashboard, onSwitchToGraphTab }: ChatPanelProps) {
+/** Welcome bubble shown at the top of an empty chat. */
+const makeWelcomeMessage = (): Message => ({
+  id: "welcome",
+  role: "assistant",
+  content:
+    "Welcome to SPARS lens! I can help you with:\n\n" +
+    "- Query your database with natural language\n" +
+    "- Help you with your questions\n" +
+    "- Generate insights from your data",
+  timestamp: new Date(),
+});
+
+function ChatPanel({
+  isFullscreen,
+  onToggleFullscreen,
+  onOpenConvertDialog,
+  onSaveToDashboard,
+  onSwitchToGraphTab,
+  queuedQuestion,
+  onQueuedQuestionConsumed,
+}: ChatPanelProps) {
   const { toast } = useToast();
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [isClearingChat, setIsClearingChat] = useState(false);
+  const [isExportingChat, setIsExportingChat] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -1006,6 +1040,91 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
     return () => window.removeEventListener("db-send-question" as any, handler as any);
   }, [handleSend]);
 
+  // A suggested question was clicked while the chat was hidden (right panel maximized).
+  // The parent re-shows the chat; once it has mounted and loaded history, send it.
+  useEffect(() => {
+    if (historyLoading || !queuedQuestion) return;
+    onQueuedQuestionConsumed?.();
+    handleSend(queuedQuestion);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyLoading, queuedQuestion]);
+
+  // ── Export chat → Excel ────────────────────────────────────────────────────
+  const handleExportChat = async () => {
+    if (isExportingChat) return;
+    setIsExportingChat(true);
+    try {
+      // Fetch the complete history from the backend (not just what is rendered).
+      const [data, XLSX] = await Promise.all([
+        getChatHistory({ bustCache: true, limit: 100000 }),
+        import("xlsx"),
+      ]);
+      const history = data.messages.filter((m) => m.role === "user" || (m.content ?? "").trim());
+      if (history.length === 0) {
+        toast({ title: "Nothing to export", description: "There are no chat messages yet." });
+        return;
+      }
+
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const fmt = (iso?: string | null) => {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return "";
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      };
+      // Excel cells are limited to 32,767 characters.
+      const cell = (s?: string) => (s ?? "").slice(0, 32000);
+
+      const rows: string[][] = [["Asked At", "Question", "Answered At", "Answer"]];
+      const pushRow = (q: ChatMessageItem | null, a: ChatMessageItem | null) =>
+        rows.push([fmt(q?.created_at), cell(q?.content), fmt(a?.created_at), cell(a?.content)]);
+
+      let pendingQ: ChatMessageItem | null = null;
+      for (const m of history) {
+        if (m.role === "user") {
+          if (pendingQ) pushRow(pendingQ, null);
+          pendingQ = m;
+        } else {
+          pushRow(pendingQ, m);
+          pendingQ = null;
+        }
+      }
+      if (pendingQ) pushRow(pendingQ, null);
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [{ wch: 20 }, { wch: 60 }, { wch: 20 }, { wch: 100 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Chat History");
+
+      const now = new Date();
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+      XLSX.writeFile(wb, `chat-history-${stamp}.xlsx`);
+      toast({ title: "Chat exported", description: `${rows.length - 1} conversation(s) saved to Excel.` });
+    } catch (err) {
+      console.error("[ChatPanel] Export chat failed:", err);
+      toast({ title: "Export failed", description: String(err), variant: "destructive" });
+    } finally {
+      setIsExportingChat(false);
+    }
+  };
+
+  // ── Clear chat (after confirmation) ────────────────────────────────────────
+  const handleClearChat = async () => {
+    setIsClearingChat(true);
+    try {
+      await clearChatHistory();
+      setMessages([makeWelcomeMessage()]);
+      lastUserPromptRef.current = "";
+      setClearConfirmOpen(false);
+      toast({ title: "Chat cleared", description: "Your chat history has been deleted." });
+    } catch (err) {
+      console.error("[ChatPanel] Clear chat failed:", err);
+      toast({ title: "Could not clear chat", description: String(err), variant: "destructive" });
+    } finally {
+      setIsClearingChat(false);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -1140,6 +1259,42 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
         >
           {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 flex-shrink-0 ml-1"
+              aria-label="Chat options"
+              title="Chat options"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              onClick={handleExportChat}
+              disabled={isExportingChat}
+              className="cursor-pointer gap-2"
+            >
+              {isExportingChat ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4" />
+              )}
+              Export chat
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setClearConfirmOpen(true)}
+              disabled={isAwaitingResponse}
+              className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear chat
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Messages — virtualised list so long chats stay fast */}
@@ -1180,9 +1335,11 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
                       variant="ghost"
                       size="icon"
                       onClick={() => handleBookmarkQuestion(message.id, message.content)}
-                      className="h-6 w-6 xl:h-7 xl:w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1"
+                      className="group/star h-6 w-6 xl:h-7 xl:w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 hover:bg-primary/10 dark:hover:bg-primary/20"
+                      aria-label="Bookmark question"
+                      title="Bookmark question"
                     >
-                      <Star className="h-3 w-3 xl:h-4 xl:w-4 text-muted-foreground hover:text-primary" />
+                      <Star className="h-3 w-3 xl:h-4 xl:w-4 text-muted-foreground transition-colors group-hover/star:text-primary group-hover/star:fill-primary/30 dark:group-hover/star:text-sky-300 dark:group-hover/star:fill-sky-300/30" />
                     </Button>
                   )}
 
@@ -1338,6 +1495,17 @@ function ChatPanel({ isFullscreen, onToggleFullscreen, onOpenConvertDialog, onSa
           </div>
         </div>
       </div>
+
+      {/* Clear chat confirmation */}
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        loading={isClearingChat}
+        title="Clear all chat?"
+        description="This will permanently delete your entire chat history, including all questions and answers. This action cannot be undone."
+        confirmLabel="Clear chat"
+        onConfirm={handleClearChat}
+        onCancel={() => setClearConfirmOpen(false)}
+      />
 
       {/* SQL popup: single dialog for viewing generated SQL */}
       <Dialog open={!!sqlPopupMessage} onOpenChange={(open) => !open && setSqlPopupMessage(null)}>
@@ -1902,12 +2070,12 @@ function DatabaseTabs({
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8 opacity-70 group-hover:opacity-100 transition-opacity"
+                                      className="group/send flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8 opacity-70 group-hover:opacity-100 transition-opacity hover:bg-primary/10 dark:hover:bg-primary/25"
                                       onClick={() => handleSendQuestion(question)}
                                       disabled={isChatLoading}
                                       aria-label="Send question"
                                     >
-                                      <Send className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                                      <Send className="h-3 w-3 sm:h-4 sm:w-4 text-primary transition-colors group-hover/send:text-primary-hover dark:text-sky-400 dark:group-hover/send:text-sky-300" />
                                     </Button>
                                   </span>
                                 </TooltipTrigger>
@@ -2104,6 +2272,22 @@ export default function ChatWithDatabase() {
   const [activeRightTab, setActiveRightTab] = useState("overview");
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+
+  // Suggested question clicked while the chat is hidden (right panel maximized).
+  // ChatPanel isn't mounted then, so nobody would receive "db-send-question":
+  // bring the chat back and hand the question to it to send once it has loaded.
+  const [queuedQuestion, setQueuedQuestion] = useState<string | null>(null);
+  const tabsFullscreenRef = useRef(tabsFullscreen);
+  tabsFullscreenRef.current = tabsFullscreen;
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if (!tabsFullscreenRef.current) return; // chat is visible — ChatPanel handles it
+      setQueuedQuestion((e as CustomEvent<string>).detail);
+      setTabsFullscreen(false);
+    };
+    window.addEventListener("db-send-question", handler);
+    return () => window.removeEventListener("db-send-question", handler);
+  }, []);
   const graphsInitialLoadDoneRef = useRef(false);
 
   // Load persisted graphs from DB on mount
@@ -2278,6 +2462,8 @@ const handleSaveToDashboard = async (msg: Message, name: string, tableIndexOrAll
               }}
               onSaveToDashboard={handleSaveToDashboard}
               onSwitchToGraphTab={() => setActiveRightTab("graphs")}
+              queuedQuestion={queuedQuestion}
+              onQueuedQuestionConsumed={() => setQueuedQuestion(null)}
             />
           </div>
         )}
