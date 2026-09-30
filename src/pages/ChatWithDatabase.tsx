@@ -103,7 +103,16 @@ interface Message {
   tables?: TableEntry[];
   /** Generated SQL for this response (from Vanna or LangChain) */
   sql_query?: string;
+  /** This assistant message is a failure / timeout notice rather than a real answer. */
+  isError?: boolean;
 }
+
+/** Client-side safety net: slightly above the backend's 90 s limit. */
+const CLIENT_TIMEOUT_MS = 100_000;
+const CLIENT_GENERIC_ERROR_MESSAGE =
+  "I wasn't able to get an answer for this question just now. This is usually temporary. Please try again in a moment, and if it keeps happening, try rephrasing your question.";
+const CLIENT_TIMEOUT_MESSAGE =
+  "This query took too much time to complete. Please try again (a simpler or more specific question may help).";
 
 /** One chart instance in the Graphs tab */
 export interface GraphInstance {
@@ -604,6 +613,7 @@ function ChatPanel({
             table_columns: m.table_columns,
             tables: m.tables as TableEntry[] | undefined,
             sql_query: m.sql_query,
+            isError: m.is_error || undefined,
           }));
 
           let finalMessages: Message[] = [welcome, ...historyMessages];
@@ -717,10 +727,22 @@ function ChatPanel({
         table_columns: m.table_columns,
         tables: m.tables as TableEntry[] | undefined,
         sql_query: m.sql_query,
+        isError: m.is_error || undefined,
         ...(stillPending && idx === assistantIdx ? { isStreaming: true } : {}),
       }));
 
       if (!stillPending) {
+        // The question failed / timed out while we were away: put it back in the
+        // input box so it can be retried (the error answer stays in the chat).
+        const failedIdx = findPendingAssistantIndex(
+          msgs,
+          pendingUserMessageIdRef.current,
+          pendingUserContentRef.current,
+        );
+        if (failedIdx >= 0 && msgs[failedIdx].is_error) {
+          const q = pendingUserContentRef.current?.trim();
+          if (q) setInput((prev) => (prev.trim() ? prev : q));
+        }
         pendingUserContentRef.current = null;
         pendingUserMessageIdRef.current = null;
         setAwaitingResponse(false);
@@ -857,6 +879,14 @@ function ChatPanel({
     let tableColumns: string[] = [];
     let allTables: TableEntry[] = [];
     let sqlQuery = "";
+    // Set when the backend reports a failure / timeout for this question.
+    let streamFailed = false;
+    // Safety net in case the backend never answers (it enforces its own 90 s limit).
+    let clientTimedOut = false;
+    const clientTimer = setTimeout(() => {
+      clientTimedOut = true;
+      controller.abort();
+    }, CLIENT_TIMEOUT_MS);
 
     try {
       const reader = await streamChat(textToSend, controller.signal);
@@ -914,21 +944,53 @@ function ChatPanel({
             setIsLoading(false);
             window.dispatchEvent(new CustomEvent("db-chat-loading", { detail: false }));
           } else if (event.type === "error") {
+            // Backend failure / timeout: the message is stored as this question's
+            // answer (so it survives a reload); show it instead of "Thinking…".
             console.error("[ChatPanel] SSE error:", event.content);
-            toast({ title: "Error", description: event.content as string, variant: "destructive" });
+            streamFailed = true;
+            fullContent = (event.content as string) || CLIENT_GENERIC_ERROR_MESSAGE;
+            streamedContentRef.current = fullContent;
+            hasTable = false;
+            tableData = [];
+            tableColumns = [];
+            allTables = [];
+            sqlQuery = "";
+            setMessages(prev => prev.map(m =>
+              m.id === assistantId ? { ...m, content: fullContent, isError: true } : m
+            ));
           }
         }
       }
 
+      // Stream ended without a single answer/error event (e.g. dropped connection).
+      if (!fullContent.trim()) {
+        streamFailed = true;
+        fullContent = CLIENT_GENERIC_ERROR_MESSAGE;
+      }
+
       setMessages(prev => prev.map(m =>
         m.id === assistantId
-          ? { ...m, content: fullContent, isStreaming: false, has_table: hasTable, table_data: tableData, table_columns: tableColumns, tables: allTables, sql_query: sqlQuery || undefined }
+          ? { ...m, content: fullContent, isStreaming: false, isError: streamFailed || undefined, has_table: hasTable, table_data: tableData, table_columns: tableColumns, tables: allTables, sql_query: sqlQuery || undefined }
           : m
       ));
+      if (streamFailed) {
+        // Put the question back in the input box so the user can simply retry.
+        setInput((prev) => (prev.trim() ? prev : textToSend));
+      }
     } catch (err) {
       const error = err as Error;
 
-      if (error.name === "AbortError") {
+      if (clientTimedOut) {
+        console.warn("[ChatPanel] Client-side timeout — no answer received");
+        // Best effort: tell the backend to drop the stuck request.
+        cancelChatGeneration(pendingUserMessageIdRef.current ?? undefined, false).catch(() => undefined);
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId
+            ? { ...m, content: CLIENT_TIMEOUT_MESSAGE, isStreaming: false, isError: true }
+            : m
+        ));
+        setInput((prev) => (prev.trim() ? prev : textToSend));
+      } else if (error.name === "AbortError") {
         // User deliberately stopped the generation
         console.log("[ChatPanel] Generation stopped by user");
         if (thinkingStopHandledRef.current) {
@@ -958,12 +1020,19 @@ function ChatPanel({
         console.error("[ChatPanel] Fetch error:", error);
         setMessages(prev => prev.map(m =>
           m.id === assistantId
-            ? { ...m, content: `Sorry, something went wrong: ${error.message}`, isStreaming: false }
+            ? {
+                ...m,
+                content:
+                  "I couldn't reach the server to get an answer. Please check your connection and try again.",
+                isStreaming: false,
+                isError: true,
+              }
             : m
         ));
         toast({ title: "Connection error", description: error.message, variant: "destructive" });
       }
     } finally {
+      clearTimeout(clientTimer);
       abortControllerRef.current = null;
       isLoadingRef.current = false;
       setIsLoading(false);
@@ -1347,7 +1416,9 @@ function ChatPanel({
                     <div className={`rounded-lg p-2 xl:p-3 min-w-0 ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
-                        : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible"
+                        : message.isError
+                          ? "bg-destructive/5 border border-destructive/40 text-foreground overflow-x-auto overflow-y-visible"
+                          : "bg-background border border-border text-foreground overflow-x-auto overflow-y-visible"
                     }`}>
                       {message.role === "user" ? (
                         <p className="text-xs xl:text-sm whitespace-pre-wrap break-words min-w-0" style={{ wordBreak: "break-word" }}>{message.content}</p>

@@ -180,6 +180,8 @@ export interface ChatMessageItem {
   table_columns: string[];
   tables?: { columns: string[]; data: Record<string, string>[] }[];
   sql_query?: string;
+  /** True for a stored failure/timeout notice (shown as the answer to that question). */
+  is_error?: boolean;
   created_at: string;
 }
 
